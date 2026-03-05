@@ -58,6 +58,66 @@ Once connected, call the `memory_setup` tool to inject memory management instruc
 
 This writes a prompt block into your agent's config (e.g., `AGENTS.md` for OpenCode, `CLAUDE.md` for Claude Code) that teaches the agent when and how to use Mnemo's tools.
 
+## Usage Examples
+
+> **Important:** You don't call Mnemo tools directly. You chat with your AI agent in natural language, and the agent decides when to call Mnemo tools behind the scenes. After running `memory_setup`, the agent already knows when and how to use them.
+
+### First-time setup
+
+```
+You:   Help me set up Mnemo for memory management
+Agent: I'll initialize Mnemo for you.
+       → [calls memory_setup tool]
+       Mnemo has been initialized. I've added memory management
+       instructions to your AGENTS.md file.
+```
+
+### Saving memories (automatic)
+
+The agent saves memories on its own when it recognizes important information:
+
+```
+You:   Let's use 4-space indentation and single quotes for this project.
+Agent: Got it. I'll follow that style.
+       → [calls memory_save: "Project code style: 4-space indentation,
+          single quotes", tags: ["preference", "code-style"]]
+       I've saved this as a memory so I'll remember it next time.
+```
+
+### Recalling context (automatic)
+
+When you start a new conversation, the agent searches for relevant memories:
+
+```
+You:   Let's continue working on the auth module.
+Agent: → [calls memory_search: "auth module"]
+       Based on my memories, last time we decided to use JWT with
+       refresh tokens and store them in httpOnly cookies. Let me
+       pick up from there.
+```
+
+### Searching memories (on request)
+
+```
+You:   Do you remember what database we chose?
+Agent: → [calls memory_search: "database choice"]
+       Yes — we decided on PostgreSQL with Prisma ORM, mainly for
+       its type safety and migration tooling.
+```
+
+### Compressing memories
+
+When memories accumulate, you can ask the agent to clean up:
+
+```
+You:   We have a lot of memories now. Can you clean them up?
+Agent: → [calls memory_compress]
+       I found 23 memories. Let me distill them into fewer notes...
+       → [calls memory_compress_apply: saves 8 distilled notes,
+          deletes 23 originals]
+       Done. Compressed 23 memories into 8 concise notes.
+```
+
 ## Tools
 
 Mnemo provides 6 MCP tools:

@@ -56,6 +56,64 @@ Claude Code（`.claude/settings.json`）：
 
 这会在 Agent 配置文件中写入一段提示（如 OpenCode 的 `AGENTS.md`、Claude Code 的 `CLAUDE.md`），告诉 Agent 何时以及如何使用 Mnemo 的工具。
 
+## 使用示例
+
+> **重要：** 你不需要直接调用 Mnemo 的工具。你只需用自然语言和 AI Agent 对话，Agent 会在幕后自动判断何时调用 Mnemo 工具。运行 `memory_setup` 后，Agent 就已经知道何时以及如何使用它们了。
+
+### 首次初始化
+
+```
+你:     帮我设置一下 Mnemo 记忆管理
+Agent:  好的，我来初始化 Mnemo。
+        → [调用 memory_setup 工具]
+        Mnemo 已初始化完成，我已将记忆管理指令写入 AGENTS.md 文件。
+```
+
+### 自动保存记忆
+
+Agent 在识别到重要信息时会自动保存：
+
+```
+你:     这个项目统一用 4 空格缩进，单引号
+Agent:  好的，我会遵循这个风格。
+        → [调用 memory_save: "项目代码风格：4空格缩进，单引号",
+           tags: ["preference", "code-style"]]
+        我已将这个偏好保存为记忆，下次会话也能记住。
+```
+
+### 自动检索上下文
+
+开始新对话时，Agent 会自动搜索相关记忆：
+
+```
+你:     继续做认证模块的开发
+Agent:  → [调用 memory_search: "认证模块"]
+        根据我的记忆，上次我们决定使用 JWT + refresh token，
+        存储在 httpOnly cookie 中。我从上次的进度继续。
+```
+
+### 主动搜索记忆
+
+```
+你:     你还记得我们选了什么数据库吗？
+Agent:  → [调用 memory_search: "数据库选择"]
+        记得——我们选择了 PostgreSQL + Prisma ORM，主要看中
+        它的类型安全和迁移工具。
+```
+
+### 压缩记忆
+
+当记忆积累较多时，可以让 Agent 清理整合：
+
+```
+你:     记忆太多了，帮我整理一下
+Agent:  → [调用 memory_compress]
+        找到 23 条记忆，我来蒸馏精简...
+        → [调用 memory_compress_apply: 保存 8 条蒸馏笔记，
+           删除 23 条原始笔记]
+        完成。已将 23 条记忆压缩为 8 条精简笔记。
+```
+
 ## 工具
 
 Mnemo 提供 6 个 MCP 工具：
