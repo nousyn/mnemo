@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
@@ -284,13 +284,18 @@ describe('memory_compress_apply 工具', () => {
 });
 
 describe('memory_setup 工具', () => {
-    it('指定 agent_type 应该成功写入配置文件', async () => {
-        // 使用 claude-code 以避免与项目自身的 AGENTS.md 冲突
-        // scope=global 写入临时 home 目录
-        const fakeHome = path.join(tmpDir, 'home');
-        await fs.mkdir(path.join(fakeHome, '.claude'), { recursive: true });
+    let cwdSpy: ReturnType<typeof vi.spyOn>;
 
-        // 临时覆盖 cwd 不影响其他测试，直接用 project scope 测试 claude-code
+    beforeAll(() => {
+        // mock process.cwd() 指向临时目录，避免在项目根目录产生 CLAUDE.md 副作用
+        cwdSpy = vi.spyOn(process, 'cwd').mockReturnValue(tmpDir);
+    });
+
+    afterAll(() => {
+        cwdSpy.mockRestore();
+    });
+
+    it('指定 agent_type 应该成功写入配置文件', async () => {
         const result = await client.callTool({
             name: 'memory_setup',
             arguments: {
@@ -300,8 +305,11 @@ describe('memory_setup 工具', () => {
         });
 
         const text = getResponseText(result);
-        // 首次写入应返回 initialized 或 updated（取决于文件是否已存在）
         expect(text).toMatch(/initialized successfully|updated/);
+
+        // 验证文件写到了临时目录而非项目根目录
+        const written = await fs.readFile(path.join(tmpDir, 'CLAUDE.md'), 'utf-8');
+        expect(written).toContain('mnemo');
     });
 
     it('重复调用应该更新而非报错', async () => {
