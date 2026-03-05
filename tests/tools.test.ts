@@ -69,7 +69,7 @@ describe('memory_save 工具', () => {
 
         const text = getResponseText(result);
         expect(text).toContain('Memory saved successfully');
-        expect(text).toMatch(/ID: \w+/);
+        expect(text).toMatch(/ID: \d{8}-\d{6}-[a-f0-9]{4}/);
         expect(text).toContain('test');
         expect(text).toContain('preference');
     });
@@ -184,7 +184,7 @@ describe('memory_delete 工具', () => {
             },
         });
 
-        const id = getResponseText(saveResult).match(/ID: (\w+)/)?.[1];
+        const id = getResponseText(saveResult).match(/ID: ([\w-]+)/)?.[1];
         expect(id).toBeTruthy();
 
         const deleteResult = await client.callTool({

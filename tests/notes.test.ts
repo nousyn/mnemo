@@ -144,6 +144,8 @@ describe('saveNote / readNote', () => {
         const note = await saveNote('保存测试', ['test'], 'opencode');
 
         expect(note.meta.id).toBeTruthy();
+        // ID 格式: YYYYMMDD-HHmmss-xxxx
+        expect(note.meta.id).toMatch(/^\d{8}-\d{6}-[a-f0-9]{4}$/);
         expect(note.meta.tags).toEqual(['test']);
         expect(note.meta.source).toBe('opencode');
         expect(note.content).toBe('保存测试');

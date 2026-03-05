@@ -4,10 +4,21 @@ import crypto from 'node:crypto';
 import { getNotesDir, ensureDir, type Note, type NoteMeta } from './config.js';
 
 /**
- * Generate a short unique ID
+ * Generate a timestamp-based unique ID.
+ * Format: YYYYMMDD-HHmmss-xxxx (4-char random suffix to avoid same-second collisions)
  */
 function generateId(): string {
-    return crypto.randomUUID().slice(0, 8);
+    const d = new Date();
+    const ts =
+        d.getFullYear().toString() +
+        String(d.getMonth() + 1).padStart(2, '0') +
+        String(d.getDate()).padStart(2, '0') +
+        '-' +
+        String(d.getHours()).padStart(2, '0') +
+        String(d.getMinutes()).padStart(2, '0') +
+        String(d.getSeconds()).padStart(2, '0');
+    const suffix = crypto.randomUUID().slice(0, 4);
+    return `${ts}-${suffix}`;
 }
 
 /**
