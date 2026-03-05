@@ -24,19 +24,22 @@ npm install -g @s_s/mnemo
 
 ### Configure your MCP client
 
-Add Mnemo to your MCP client configuration. For example, in OpenCode (`opencode.json`):
+Add Mnemo to your MCP client configuration.
+
+OpenCode (`opencode.json`):
 
 ```json
 {
   "mcp": {
     "mnemo": {
-      "command": "mnemo"
+      "type": "local",
+      "command": ["mnemo"]
     }
   }
 }
 ```
 
-For Claude Code (`.claude/settings.json`):
+Claude Code (`.claude/settings.json`):
 
 ```json
 {

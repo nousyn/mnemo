@@ -22,13 +22,16 @@ npm install -g @s_s/mnemo
 
 ### 配置 MCP 客户端
 
-将 Mnemo 添加到你的 MCP 客户端配置。以 OpenCode（`opencode.json`）为例：
+将 Mnemo 添加到你的 MCP 客户端配置。
+
+OpenCode（`opencode.json`）：
 
 ```json
 {
   "mcp": {
     "mnemo": {
-      "command": "mnemo"
+      "type": "local",
+      "command": ["mnemo"]
     }
   }
 }
