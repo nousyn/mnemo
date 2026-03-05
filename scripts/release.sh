@@ -167,7 +167,7 @@ git tag -a "v${NEW_VERSION}" -m "v${NEW_VERSION}"
 success "版本: v${NEW_VERSION}"
 
 echo -e "  ${DIM}npm publish...${RESET}"
-npm publish
+npm publish --access public
 success "npm 发布完成"
 
 echo -e "  ${DIM}git push...${RESET}"

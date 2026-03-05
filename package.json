@@ -1,13 +1,15 @@
 {
-  "name": "mnemo",
-  "version": "0.1.0",
+  "name": "@s_s/mnemo",
+  "version": "1.0.0",
   "description": "Memory management MCP server for AI coding assistants",
   "type": "module",
   "main": "./build/index.js",
   "bin": {
-    "mnemo": "./build/index.js"
+    "mnemo": "build/index.js"
   },
-  "files": ["build"],
+  "files": [
+    "build"
+  ],
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
