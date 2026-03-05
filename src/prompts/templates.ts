@@ -22,6 +22,12 @@ You have access to a persistent memory system (Mnemo). Use it to retain importan
 - When the user references past discussions or decisions
 - When you need background context for a task
 - When the user asks "do you remember..." or similar
+- memory_search returns **summaries** — use memory_get with the returned IDs to retrieve full content when needed
+
+### When to get full memory content (memory_get):
+- After memory_search, when you need the complete content of specific memories
+- Pass one or more note IDs from memory_search results to retrieve full content
+- Only retrieve what you actually need — summaries from memory_search are often sufficient
 
 ### When to compress memory (memory_compress):
 - When you notice the conversation has generated many memory notes

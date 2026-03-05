@@ -8,7 +8,8 @@ Mnemo solves the problem of context window overflow — important decisions, use
 
 ## Features
 
-- **Semantic search** — find memories by meaning, not just keywords (powered by local embeddings)
+- **Hybrid search** — find memories by meaning and keywords (vector + keyword, with automatic fallback)
+- **Progressive disclosure** — search returns summaries; retrieve full content on demand
 - **Multi-agent support** — works with OpenCode, Claude Code, Openclaw, and Codex
 - **Fully local** — no API calls, no cloud storage; all data stays on your machine
 - **Auto-prompted** — injects instructions into your agent's config so it knows when to save and recall memories
@@ -151,6 +152,8 @@ Agent: → [calls memory_search: "auth module"]
 ```
 You:   Do you remember what database we chose?
 Agent: → [calls memory_search: "database choice"]
+       Found a relevant memory about database selection.
+       → [calls memory_get: "<note-id>"]
        Yes — we decided on PostgreSQL with Prisma ORM, mainly for
        its type safety and migration tooling.
 ```
@@ -170,16 +173,17 @@ Agent: → [calls memory_compress]
 
 ## Tools
 
-Mnemo provides 6 MCP tools:
+Mnemo provides 7 MCP tools:
 
-| Tool                    | Description                                                                 |
-| ----------------------- | --------------------------------------------------------------------------- |
-| `memory_setup`          | Initialize Mnemo — inject usage instructions into agent config              |
-| `memory_save`           | Save a memory note with optional tags and source                            |
-| `memory_search`         | Semantic search across memories (supports `source_filter` and `tag_filter`) |
-| `memory_compress`       | List all notes for review/distillation                                      |
-| `memory_compress_apply` | Atomically save distilled notes and delete originals                        |
-| `memory_delete`         | Delete notes by ID                                                          |
+| Tool                    | Description                                                         |
+| ----------------------- | ------------------------------------------------------------------- |
+| `memory_setup`          | Initialize Mnemo — inject usage instructions into agent config      |
+| `memory_save`           | Save a memory note with optional tags and source                    |
+| `memory_search`         | Hybrid search across memories; returns summaries (supports filters) |
+| `memory_get`            | Retrieve full content of specific notes by ID                       |
+| `memory_compress`       | List all notes for review/distillation                              |
+| `memory_compress_apply` | Atomically save distilled notes and delete originals                |
+| `memory_delete`         | Delete notes by ID                                                  |
 
 ## How It Works
 
@@ -199,9 +203,11 @@ Memory notes are stored as Markdown files with YAML frontmatter:
 
 Override the data directory with `MNEMO_DATA_DIR` environment variable.
 
-### Semantic Search
+### Hybrid Search
 
-Mnemo uses [all-MiniLM-L6-v2](https://huggingface.co/Xenova/all-MiniLM-L6-v2) (33MB, 384 dimensions) for local embeddings via `@huggingface/transformers`. The model is preloaded at server startup so it's ready before the first search.
+Mnemo uses a hybrid search strategy combining **vector search** (semantic similarity via [all-MiniLM-L6-v2](https://huggingface.co/Xenova/all-MiniLM-L6-v2), 33MB, 384 dimensions) and **keyword search** (case-insensitive term matching). Results from both are merged with weighted scoring (vector: 0.7, keyword: 0.3). If the embedding model isn't ready yet, keyword search works as a graceful fallback.
+
+Search results return summaries by default. Use `memory_get` with note IDs to retrieve full content — this keeps context usage minimal when browsing results.
 
 ### Memory Lifecycle
 

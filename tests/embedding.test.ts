@@ -11,7 +11,7 @@ import {
     isEmbeddingReady,
     preloadEmbedding,
 } from '../src/core/embedding.js';
-import { saveNote } from '../src/core/notes.js';
+import { saveNote, deleteNote } from '../src/core/notes.js';
 
 let tmpDir: string;
 
@@ -96,28 +96,53 @@ describe('indexNote / searchNotes / removeFromIndex', () => {
         await removeMultipleFromIndex([n1.meta.id, n2.meta.id]);
     });
 
-    it('removeFromIndex 后搜索不应返回该笔记', async () => {
-        const note = await saveNote('即将删除的笔记', ['temp'], 'opencode');
+    it('removeFromIndex + 删除文件后搜索不应返回该笔记', async () => {
+        const note = await saveNote('即将删除的笔记 uniqueDelTest', ['temp'], 'opencode');
         await indexNote(note);
 
         await removeFromIndex(note.meta.id);
+        await deleteNote(note.meta.id);
 
-        const results = await searchNotes('即将删除', 5);
+        const results = await searchNotes('uniqueDelTest', 5);
         const ids = results.map((r) => r.id);
         expect(ids).not.toContain(note.meta.id);
     });
 
-    it('removeMultipleFromIndex 应批量删除', async () => {
-        const n1 = await saveNote('批量删除1', ['temp'], 'opencode');
-        const n2 = await saveNote('批量删除2', ['temp'], 'opencode');
+    it('removeMultipleFromIndex + 删除文件后应批量清除', async () => {
+        const n1 = await saveNote('批量删除测试1 batchDelAlpha', ['temp'], 'opencode');
+        const n2 = await saveNote('批量删除测试2 batchDelBeta', ['temp'], 'opencode');
         await indexNote(n1);
         await indexNote(n2);
 
         await removeMultipleFromIndex([n1.meta.id, n2.meta.id]);
+        await deleteNote(n1.meta.id);
+        await deleteNote(n2.meta.id);
 
-        const results = await searchNotes('批量删除', 5);
+        const results = await searchNotes('batchDelAlpha batchDelBeta', 5);
         const ids = results.map((r) => r.id);
         expect(ids).not.toContain(n1.meta.id);
         expect(ids).not.toContain(n2.meta.id);
+    });
+});
+
+describe('hybrid search (vector + keyword)', () => {
+    it('关键词搜索应能找到精确匹配的笔记', async () => {
+        const note = await saveNote('项目使用 unicornXYZ 作为唯一标识符方案', ['test'], 'opencode');
+        // 不索引到 vectra，仅靠关键词搜索
+        const results = await searchNotes('unicornXYZ', 5);
+        expect(results.length).toBeGreaterThan(0);
+        expect(results.some((r) => r.id === note.meta.id)).toBe(true);
+    });
+
+    it('混合搜索应合并两种来源的结果', async () => {
+        const note = await saveNote('混合搜索测试笔记 hybridTestAlpha 格式化工具', ['hybrid'], 'opencode');
+        await indexNote(note);
+
+        // 这个查询既能通过语义（格式化工具）也能通过关键词（hybridTestAlpha）找到
+        const results = await searchNotes('hybridTestAlpha', 5);
+        expect(results.length).toBeGreaterThan(0);
+        expect(results.some((r) => r.id === note.meta.id)).toBe(true);
+
+        await removeFromIndex(note.meta.id);
     });
 });

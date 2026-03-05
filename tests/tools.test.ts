@@ -7,9 +7,11 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { registerSaveTool } from '../src/tools/save.js';
 import { registerSearchTool } from '../src/tools/search.js';
+import { registerGetTool } from '../src/tools/get.js';
 import { registerCompressTool } from '../src/tools/compress.js';
 import { registerSetupTool } from '../src/tools/setup.js';
 import { preloadEmbedding, embed } from '../src/core/embedding.js';
+import { extractSummary } from '../src/tools/search.js';
 
 let tmpDir: string;
 let client: Client;
@@ -27,6 +29,7 @@ beforeAll(async () => {
     server = new McpServer({ name: 'mnemo-test', version: '0.1.0' });
     registerSaveTool(server);
     registerSearchTool(server);
+    registerGetTool(server);
     registerCompressTool(server);
     registerSetupTool(server);
 
@@ -49,13 +52,14 @@ function getResponseText(result: any): string {
 }
 
 describe('tools/list', () => {
-    it('应该列出所有 6 个工具', async () => {
+    it('应该列出所有 7 个工具', async () => {
         const { tools } = await client.listTools();
         const names = tools.map((t) => t.name).sort();
         expect(names).toEqual([
             'memory_compress',
             'memory_compress_apply',
             'memory_delete',
+            'memory_get',
             'memory_save',
             'memory_search',
             'memory_setup',
@@ -95,7 +99,7 @@ describe('memory_save 工具', () => {
 });
 
 describe('memory_search 工具', () => {
-    it('应该能搜索到之前保存的笔记', async () => {
+    it('应该能搜索到之前保存的笔记（返回摘要）', async () => {
         // 先保存一条有特征的笔记
         await client.callTool({
             name: 'memory_save',
@@ -116,7 +120,8 @@ describe('memory_search 工具', () => {
 
         const text = getResponseText(result);
         expect(text).toContain('relevant memories');
-        expect(text).toContain('Vitest');
+        expect(text).toContain('memory_get');
+        expect(text).toContain('Summary:');
     });
 
     it('source_filter 应该过滤结果', async () => {
@@ -165,7 +170,7 @@ describe('memory_search 工具', () => {
         });
 
         const text = getResponseText(result);
-        expect(text).toContain('qwerty');
+        expect(text).toContain('architecture');
     });
 
     it('tag_filter 不匹配时应返回空结果', async () => {
@@ -180,6 +185,87 @@ describe('memory_search 工具', () => {
 
         const text = getResponseText(result);
         expect(text).toContain('No relevant memories found');
+    });
+});
+
+describe('memory_get 工具', () => {
+    it('应该通过 ID 获取完整笔记内容', async () => {
+        const saveResult = await client.callTool({
+            name: 'memory_save',
+            arguments: {
+                content: 'memory_get 测试：完整内容应该在这里可见',
+                tags: ['get-test'],
+                source: 'opencode',
+            },
+        });
+
+        const id = getResponseText(saveResult).match(/ID: ([\w-]+)/)?.[1];
+        expect(id).toBeTruthy();
+
+        const getResult = await client.callTool({
+            name: 'memory_get',
+            arguments: { ids: [id!] },
+        });
+
+        const text = getResponseText(getResult);
+        expect(text).toContain('memory_get 测试：完整内容应该在这里可见');
+        expect(text).toContain(id!);
+        expect(text).toContain('get-test');
+    });
+
+    it('应该能同时获取多条笔记', async () => {
+        const save1 = await client.callTool({
+            name: 'memory_save',
+            arguments: { content: '多条获取测试 A alpha', tags: ['multi-get'], source: 'opencode' },
+        });
+        const save2 = await client.callTool({
+            name: 'memory_save',
+            arguments: { content: '多条获取测试 B beta', tags: ['multi-get'], source: 'opencode' },
+        });
+
+        const id1 = getResponseText(save1).match(/ID: ([\w-]+)/)?.[1];
+        const id2 = getResponseText(save2).match(/ID: ([\w-]+)/)?.[1];
+        expect(id1).toBeTruthy();
+        expect(id2).toBeTruthy();
+
+        const getResult = await client.callTool({
+            name: 'memory_get',
+            arguments: { ids: [id1!, id2!] },
+        });
+
+        const text = getResponseText(getResult);
+        expect(text).toContain('alpha');
+        expect(text).toContain('beta');
+    });
+
+    it('不存在的 ID 应返回未找到提示', async () => {
+        const result = await client.callTool({
+            name: 'memory_get',
+            arguments: { ids: ['nonexistent-id-get-test'] },
+        });
+
+        const text = getResponseText(result);
+        expect(text).toContain('No memories found');
+        expect(text).toContain('nonexistent-id-get-test');
+    });
+
+    it('混合存在与不存在的 ID 应部分返回', async () => {
+        const saveResult = await client.callTool({
+            name: 'memory_save',
+            arguments: { content: '部分获取测试内容 gamma', tags: ['partial-get'], source: 'opencode' },
+        });
+
+        const id = getResponseText(saveResult).match(/ID: ([\w-]+)/)?.[1];
+        expect(id).toBeTruthy();
+
+        const getResult = await client.callTool({
+            name: 'memory_get',
+            arguments: { ids: [id!, 'nonexistent-xyz'] },
+        });
+
+        const text = getResponseText(getResult);
+        expect(text).toContain('gamma');
+        expect(text).toContain('nonexistent-xyz');
     });
 });
 
@@ -362,5 +448,26 @@ describe('memory_setup 工具', () => {
 
         const text = getResponseText(result);
         expect(text).toContain('updated');
+    });
+});
+
+describe('extractSummary', () => {
+    it('短文本应原样返回', () => {
+        expect(extractSummary('短内容')).toBe('短内容');
+    });
+
+    it('多行文本应只返回第一行', () => {
+        expect(extractSummary('第一行\n第二行\n第三行')).toBe('第一行');
+    });
+
+    it('超长第一行应截断并加省略号', () => {
+        const longLine = 'a'.repeat(300);
+        const result = extractSummary(longLine, 200);
+        expect(result).toHaveLength(203); // 200 + '...'
+        expect(result.endsWith('...')).toBe(true);
+    });
+
+    it('空内容应返回空字符串', () => {
+        expect(extractSummary('')).toBe('');
     });
 });

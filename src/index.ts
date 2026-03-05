@@ -6,6 +6,7 @@ import { registerSetupTool } from './tools/setup.js';
 import { registerSaveTool } from './tools/save.js';
 import { registerSearchTool } from './tools/search.js';
 import { registerCompressTool } from './tools/compress.js';
+import { registerGetTool } from './tools/get.js';
 import { preloadEmbedding } from './core/embedding.js';
 
 const server = new McpServer({
@@ -18,6 +19,7 @@ const server = new McpServer({
 registerSetupTool(server);
 registerSaveTool(server);
 registerSearchTool(server);
+registerGetTool(server);
 registerCompressTool(server);
 
 async function main() {

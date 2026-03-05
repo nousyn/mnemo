@@ -12,6 +12,7 @@ describe('getPromptBlock', () => {
         const block = getPromptBlock();
         expect(block).toContain('memory_save');
         expect(block).toContain('memory_search');
+        expect(block).toContain('memory_get');
         expect(block).toContain('memory_compress');
         expect(block).toContain('context window is nearly full');
     });

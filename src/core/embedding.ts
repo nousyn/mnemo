@@ -1,5 +1,6 @@
 import { LocalIndex } from 'vectra';
 import { getIndexDir, ensureDir, type Note } from './config.js';
+import { readAllNotes } from './notes.js';
 
 let embedder: any = null;
 let embedderLoading: Promise<any> | null = null;
@@ -113,35 +114,139 @@ export async function removeMultipleFromIndex(noteIds: string[]): Promise<void> 
     }
 }
 
+export interface SearchResult {
+    id: string;
+    score: number;
+    text: string;
+    tags: string;
+    source: string;
+    created: string;
+}
+
 /**
- * Search for similar notes by query text
+ * Keyword search: split query into terms, score each note by match ratio.
+ * Case-insensitive substring matching.
  */
-export async function searchNotes(
+function keywordSearch(
+    notes: Note[],
     query: string,
-    topK: number = 5,
     sourceFilter?: string,
-): Promise<
-    Array<{
-        id: string;
-        score: number;
-        text: string;
-        tags: string;
-        source: string;
-        created: string;
-    }>
-> {
-    const index = await getIndex();
-    const vector = await embed(query);
+): Array<{ id: string; score: number; note: Note }> {
+    const terms = query
+        .toLowerCase()
+        .split(/\s+/)
+        .filter((t) => t.length > 1);
+    if (terms.length === 0) return [];
 
-    const filter = sourceFilter ? { source: { $eq: sourceFilter } } : undefined;
-    const results = await index.queryItems(vector, '', topK, filter);
+    const results: Array<{ id: string; score: number; note: Note }> = [];
 
-    return results.map((r) => ({
-        id: r.item.metadata.id as string,
-        score: r.score,
-        text: r.item.metadata.text as string,
-        tags: r.item.metadata.tags as string,
-        source: r.item.metadata.source as string,
-        created: r.item.metadata.created as string,
-    }));
+    for (const note of notes) {
+        if (sourceFilter && note.meta.source !== sourceFilter) continue;
+
+        const contentLower = note.content.toLowerCase();
+        let matched = 0;
+
+        for (const term of terms) {
+            if (contentLower.includes(term)) {
+                matched++;
+            }
+        }
+
+        if (matched > 0) {
+            const score = matched / terms.length;
+            results.push({ id: note.meta.id, score, note });
+        }
+    }
+
+    results.sort((a, b) => b.score - a.score);
+    return results;
+}
+
+/**
+ * Merge vector search and keyword search results.
+ * Deduplicates by ID, takes weighted combination for items found by both.
+ */
+function mergeResults(
+    vectorResults: SearchResult[],
+    keywordResults: Array<{ id: string; score: number; note: Note }>,
+    vectorWeight: number = 0.7,
+    textWeight: number = 0.3,
+): SearchResult[] {
+    const merged = new Map<string, SearchResult>();
+
+    // Add vector results
+    for (const r of vectorResults) {
+        merged.set(r.id, { ...r, score: r.score * vectorWeight });
+    }
+
+    // Merge keyword results
+    for (const kr of keywordResults) {
+        const existing = merged.get(kr.id);
+        if (existing) {
+            // Found in both — combine scores
+            existing.score += kr.score * textWeight;
+        } else {
+            // Only found by keyword search
+            merged.set(kr.id, {
+                id: kr.id,
+                score: kr.score * textWeight,
+                text: kr.note.content.slice(0, 500),
+                tags: kr.note.meta.tags.join(','),
+                source: kr.note.meta.source,
+                created: kr.note.meta.created,
+            });
+        }
+    }
+
+    const results = Array.from(merged.values());
+    results.sort((a, b) => b.score - a.score);
+    return results;
+}
+
+/**
+ * Search for similar notes using hybrid search (vector + keyword).
+ * Falls back to keyword-only if embedding is not ready.
+ */
+export async function searchNotes(query: string, topK: number = 5, sourceFilter?: string): Promise<SearchResult[]> {
+    // Vector search
+    let vectorResults: SearchResult[] = [];
+    if (isEmbeddingReady()) {
+        const index = await getIndex();
+        const vector = await embed(query);
+        const filter = sourceFilter ? { source: { $eq: sourceFilter } } : undefined;
+        const results = await index.queryItems(vector, '', topK, filter);
+
+        vectorResults = results.map((r) => ({
+            id: r.item.metadata.id as string,
+            score: r.score,
+            text: r.item.metadata.text as string,
+            tags: r.item.metadata.tags as string,
+            source: r.item.metadata.source as string,
+            created: r.item.metadata.created as string,
+        }));
+    }
+
+    // Keyword search
+    const allNotes = await readAllNotes();
+    const keywordResults = keywordSearch(allNotes, query, sourceFilter);
+
+    // Merge
+    if (vectorResults.length === 0 && keywordResults.length === 0) {
+        return [];
+    }
+
+    if (vectorResults.length === 0) {
+        // Keyword-only fallback
+        return keywordResults.slice(0, topK).map((kr) => ({
+            id: kr.id,
+            score: kr.score,
+            text: kr.note.content.slice(0, 500),
+            tags: kr.note.meta.tags.join(','),
+            source: kr.note.meta.source,
+            created: kr.note.meta.created,
+        }));
+    }
+
+    const merged = mergeResults(vectorResults, keywordResults);
+    return merged.slice(0, topK);
 }
