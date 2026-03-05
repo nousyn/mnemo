@@ -142,6 +142,45 @@ describe('memory_search 工具', () => {
         // 过滤了 claude-code 来源，不应出现该笔记
         expect(text).not.toContain('xyzzy');
     });
+
+    it('tag_filter 应该只返回包含指定标签的笔记', async () => {
+        // 保存一条有特殊 tag 的笔记
+        await client.callTool({
+            name: 'memory_save',
+            arguments: {
+                content: '架构决策：使用 vectra 做本地向量存储 qwerty',
+                tags: ['architecture', 'decision'],
+                source: 'opencode',
+            },
+        });
+
+        // 用 tag_filter 搜索
+        const result = await client.callTool({
+            name: 'memory_search',
+            arguments: {
+                query: '向量存储',
+                top_k: 10,
+                tag_filter: ['architecture'],
+            },
+        });
+
+        const text = getResponseText(result);
+        expect(text).toContain('qwerty');
+    });
+
+    it('tag_filter 不匹配时应返回空结果', async () => {
+        const result = await client.callTool({
+            name: 'memory_search',
+            arguments: {
+                query: '向量存储 qwerty',
+                top_k: 10,
+                tag_filter: ['nonexistent-tag-xyz'],
+            },
+        });
+
+        const text = getResponseText(result);
+        expect(text).toContain('No relevant memories found');
+    });
 });
 
 describe('memory_compress 工具', () => {

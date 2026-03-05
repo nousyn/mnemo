@@ -15,6 +15,7 @@ You have access to a persistent memory system (Mnemo). Use it to retain importan
 - Technical architecture or design choices
 - Important context that would be useful in future conversations
 - Task outcomes and lessons learned
+- When context window is nearly full, save key information from the current conversation to preserve continuity
 
 ### When to search memory (memory_search):
 - At the START of each conversation, search for relevant context based on the user's first message
@@ -59,7 +60,7 @@ const AGENT_CONFIG: Record<
     },
     openclaw: {
         fileName: 'AGENTS.md',
-        globalPath: (home) => `${home}/.config/openclaw/AGENTS.md`,
+        globalPath: (home) => `${home}/.openclaw/workspace/AGENTS.md`,
         projectPath: (cwd) => `${cwd}/AGENTS.md`,
     },
     codex: {

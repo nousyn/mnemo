@@ -21,6 +21,14 @@ async function detectAgentType(cwd: string): Promise<AgentType | null> {
             type: 'claude-code',
             paths: [`${cwd}/CLAUDE.md`, `${home}/.claude/CLAUDE.md`],
         },
+        {
+            type: 'openclaw',
+            paths: [`${home}/.openclaw/openclaw.json`],
+        },
+        {
+            type: 'codex',
+            paths: [`${cwd}/.codex/config.toml`, `${home}/.codex/config.toml`],
+        },
     ];
 
     for (const check of checks) {

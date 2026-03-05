@@ -31,9 +31,15 @@ export function registerSearchTool(server: McpServer): void {
                     .string()
                     .optional()
                     .describe("Filter results by source agent tool, e.g., 'opencode', 'claude-code'"),
+                tag_filter: z
+                    .array(z.string())
+                    .optional()
+                    .describe(
+                        'Filter results to only include notes that have ALL of the specified tags. E.g., ["architecture", "decision"]',
+                    ),
             },
         },
-        async ({ query, top_k, source_filter }) => {
+        async ({ query, top_k, source_filter, tag_filter }) => {
             try {
                 if (!isEmbeddingReady()) {
                     return {
@@ -46,7 +52,18 @@ export function registerSearchTool(server: McpServer): void {
                     };
                 }
 
-                const results = await searchNotes(query, top_k || 5, source_filter);
+                // When tag_filter is used, fetch more results to compensate for post-filtering
+                const fetchK = tag_filter && tag_filter.length > 0 ? (top_k || 5) * 3 : top_k || 5;
+                let results = await searchNotes(query, fetchK, source_filter);
+
+                // Post-filter by tags if specified
+                if (tag_filter && tag_filter.length > 0) {
+                    results = results.filter((r) => {
+                        const noteTags = r.tags.split(',').filter(Boolean);
+                        return tag_filter.every((t) => noteTags.includes(t));
+                    });
+                    results = results.slice(0, top_k || 5);
+                }
 
                 if (results.length === 0) {
                     return {

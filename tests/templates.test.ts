@@ -13,6 +13,7 @@ describe('getPromptBlock', () => {
         expect(block).toContain('memory_save');
         expect(block).toContain('memory_search');
         expect(block).toContain('memory_compress');
+        expect(block).toContain('context window is nearly full');
     });
 });
 
@@ -77,6 +78,20 @@ describe('getAgentConfig', () => {
         expect(config.fileName).toBe('CLAUDE.md');
         expect(config.projectPath('/project')).toBe('/project/CLAUDE.md');
         expect(config.globalPath('/home/user')).toBe('/home/user/.claude/CLAUDE.md');
+    });
+
+    it('openclaw 应返回 AGENTS.md', () => {
+        const config = getAgentConfig('openclaw');
+        expect(config.fileName).toBe('AGENTS.md');
+        expect(config.projectPath('/project')).toBe('/project/AGENTS.md');
+        expect(config.globalPath('/home/user')).toBe('/home/user/.openclaw/workspace/AGENTS.md');
+    });
+
+    it('codex 应返回 AGENTS.md', () => {
+        const config = getAgentConfig('codex');
+        expect(config.fileName).toBe('AGENTS.md');
+        expect(config.projectPath('/project')).toBe('/project/AGENTS.md');
+        expect(config.globalPath('/home/user')).toBe('/home/user/.codex/AGENTS.md');
     });
 
     it('所有 agent 类型都应有配置', () => {
