@@ -24,7 +24,10 @@ npm install -g @s_s/mnemo
 
 将 Mnemo 添加到你的 MCP 客户端配置。
 
-OpenCode（`opencode.json`）：
+<details>
+<summary><strong>OpenCode</strong></summary>
+
+添加到 `opencode.json`：
 
 ```json
 {
@@ -37,7 +40,43 @@ OpenCode（`opencode.json`）：
 }
 ```
 
-Claude Code（`.claude/settings.json`）：
+</details>
+
+<details>
+<summary><strong>Claude Code</strong></summary>
+
+通过 CLI（user scope，所有项目可用）：
+
+```bash
+claude mcp add --transport stdio --scope user mnemo -- mnemo
+```
+
+配置存储在 `~/.claude.json` 中。
+
+</details>
+
+<details>
+<summary><strong>Codex</strong></summary>
+
+通过 CLI：
+
+```bash
+codex mcp add mnemo -- mnemo
+```
+
+或添加到 `~/.codex/config.toml`：
+
+```toml
+[mcp_servers.mnemo]
+command = "mnemo"
+```
+
+</details>
+
+<details>
+<summary><strong>OpenClaw</strong>（通过 mcporter skill）</summary>
+
+OpenClaw 使用 [mcporter](https://github.com/steipete/mcporter) 管理 MCP 服务器。添加到 `config/mcporter.json`（或 `~/.mcporter/mcporter.json` 全局配置）：
 
 ```json
 {
@@ -48,6 +87,14 @@ Claude Code（`.claude/settings.json`）：
   }
 }
 ```
+
+或通过 mcporter CLI：
+
+```bash
+mcporter config add mnemo -- mnemo
+```
+
+</details>
 
 ### 初始化
 

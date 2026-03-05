@@ -26,7 +26,10 @@ npm install -g @s_s/mnemo
 
 Add Mnemo to your MCP client configuration.
 
-OpenCode (`opencode.json`):
+<details>
+<summary><strong>OpenCode</strong></summary>
+
+Add to `opencode.json`:
 
 ```json
 {
@@ -39,7 +42,43 @@ OpenCode (`opencode.json`):
 }
 ```
 
-Claude Code (`.claude/settings.json`):
+</details>
+
+<details>
+<summary><strong>Claude Code</strong></summary>
+
+Via CLI (user scope, available across all projects):
+
+```bash
+claude mcp add --transport stdio --scope user mnemo -- mnemo
+```
+
+This stores the config in `~/.claude.json`.
+
+</details>
+
+<details>
+<summary><strong>Codex</strong></summary>
+
+Via CLI:
+
+```bash
+codex mcp add mnemo -- mnemo
+```
+
+Or add to `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.mnemo]
+command = "mnemo"
+```
+
+</details>
+
+<details>
+<summary><strong>OpenClaw</strong> (via mcporter skill)</summary>
+
+OpenClaw uses [mcporter](https://github.com/steipete/mcporter) to manage MCP servers. Add Mnemo to `config/mcporter.json` (or `~/.mcporter/mcporter.json` for global config):
 
 ```json
 {
@@ -50,6 +89,14 @@ Claude Code (`.claude/settings.json`):
   }
 }
 ```
+
+Or via mcporter CLI:
+
+```bash
+mcporter config add mnemo -- mnemo
+```
+
+</details>
 
 ### Initialize
 
