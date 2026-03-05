@@ -1,4 +1,4 @@
-import { type AgentType } from "../core/config.js";
+import { type AgentType } from '../core/config.js';
 
 /**
  * The memory management prompt to inject into agent configuration files.
@@ -39,82 +39,79 @@ You have access to a persistent memory system (Mnemo). Use it to retain importan
  * Agent-specific configuration file paths
  */
 const AGENT_CONFIG: Record<
-  AgentType,
-  {
-    fileName: string;
-    globalPath: (home: string) => string;
-    projectPath: (cwd: string) => string;
-  }
+    AgentType,
+    {
+        fileName: string;
+        globalPath: (home: string) => string;
+        projectPath: (cwd: string) => string;
+    }
 > = {
-  opencode: {
-    fileName: "AGENTS.md",
-    globalPath: (home) => `${home}/.config/opencode/AGENTS.md`,
-    projectPath: (cwd) => `${cwd}/AGENTS.md`,
-  },
-  "claude-code": {
-    fileName: "CLAUDE.md",
-    globalPath: (home) => `${home}/.claude/CLAUDE.md`,
-    projectPath: (cwd) => `${cwd}/CLAUDE.md`,
-  },
-  openclaw: {
-    fileName: "AGENTS.md",
-    globalPath: (home) => `${home}/.config/openclaw/AGENTS.md`,
-    projectPath: (cwd) => `${cwd}/AGENTS.md`,
-  },
-  codex: {
-    fileName: "AGENTS.md",
-    globalPath: (home) => `${home}/.codex/AGENTS.md`,
-    projectPath: (cwd) => `${cwd}/AGENTS.md`,
-  },
+    opencode: {
+        fileName: 'AGENTS.md',
+        globalPath: (home) => `${home}/.config/opencode/AGENTS.md`,
+        projectPath: (cwd) => `${cwd}/AGENTS.md`,
+    },
+    'claude-code': {
+        fileName: 'CLAUDE.md',
+        globalPath: (home) => `${home}/.claude/CLAUDE.md`,
+        projectPath: (cwd) => `${cwd}/CLAUDE.md`,
+    },
+    openclaw: {
+        fileName: 'AGENTS.md',
+        globalPath: (home) => `${home}/.config/openclaw/AGENTS.md`,
+        projectPath: (cwd) => `${cwd}/AGENTS.md`,
+    },
+    codex: {
+        fileName: 'AGENTS.md',
+        globalPath: (home) => `${home}/.codex/AGENTS.md`,
+        projectPath: (cwd) => `${cwd}/AGENTS.md`,
+    },
 };
 
 /**
  * Marker used to identify Mnemo's section in agent config files
  */
-const MARKER_START = "<!-- mnemo:start -->";
-const MARKER_END = "<!-- mnemo:end -->";
+const MARKER_START = '<!-- mnemo:start -->';
+const MARKER_END = '<!-- mnemo:end -->';
 
 /**
  * Get the prompt block wrapped with markers
  */
 export function getPromptBlock(): string {
-  return `${MARKER_START}\n${MEMORY_PROMPT}\n${MARKER_END}`;
+    return `${MARKER_START}\n${MEMORY_PROMPT}\n${MARKER_END}`;
 }
 
 /**
  * Check if content already has Mnemo prompt injected
  */
 export function hasPromptInjected(content: string): boolean {
-  return content.includes(MARKER_START);
+    return content.includes(MARKER_START);
 }
 
 /**
  * Inject or replace Mnemo prompt in content
  */
 export function injectPrompt(existingContent: string): string {
-  const block = getPromptBlock();
+    const block = getPromptBlock();
 
-  if (hasPromptInjected(existingContent)) {
-    // Replace existing block
-    const regex = new RegExp(
-      `${escapeRegex(MARKER_START)}[\\s\\S]*?${escapeRegex(MARKER_END)}`,
-      "g"
-    );
-    return existingContent.replace(regex, block);
-  }
+    if (hasPromptInjected(existingContent)) {
+        // Replace existing block
+        const regex = new RegExp(`${escapeRegex(MARKER_START)}[\\s\\S]*?${escapeRegex(MARKER_END)}`, 'g');
+        return existingContent.replace(regex, block);
+    }
 
-  // Append to end
-  const separator = existingContent.trim() ? "\n\n" : "";
-  return existingContent.trimEnd() + separator + block + "\n";
+    // Append to end
+    const separator = existingContent.trim() ? '\n\n' : '';
+    return existingContent.trimEnd() + separator + block + '\n';
 }
 
 /**
  * Get config file info for an agent type
  */
 export function getAgentConfig(agentType: AgentType) {
-  return AGENT_CONFIG[agentType];
+    return AGENT_CONFIG[agentType];
 }
 
 function escapeRegex(str: string): string {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }

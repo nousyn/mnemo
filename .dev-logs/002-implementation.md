@@ -30,23 +30,23 @@ mnemo/
 
 ### 技术选型
 
-| 组件 | 选择 | 版本 |
-|------|------|------|
-| MCP SDK | @modelcontextprotocol/sdk | latest (v1.x) |
-| Schema 校验 | zod | ^3.25 |
-| 向量存储 | vectra (LocalIndex) | 0.12.3 |
-| 本地 embedding | @huggingface/transformers | latest |
-| Embedding 模型 | Xenova/all-MiniLM-L6-v2 | 384 维，~33MB |
+| 组件           | 选择                      | 版本          |
+| -------------- | ------------------------- | ------------- |
+| MCP SDK        | @modelcontextprotocol/sdk | latest (v1.x) |
+| Schema 校验    | zod                       | ^3.25         |
+| 向量存储       | vectra (LocalIndex)       | 0.12.3        |
+| 本地 embedding | @huggingface/transformers | latest        |
+| Embedding 模型 | Xenova/all-MiniLM-L6-v2   | 384 维，~33MB |
 
 ### 实现的 MCP 工具
 
-| 工具 | 功能 |
-|------|------|
-| memory_setup | 自动检测或手动指定 agent 类型，将记忆管理提示词注入配置文件 |
-| memory_save | 保存记忆便签到 Markdown 文件 + 向量索引，超阈值时提示压缩 |
-| memory_search | 语义相似度检索，支持 top_k 和 source 过滤 |
-| memory_compress | 返回所有便签供 LLM 蒸馏，或统计标签分布 |
-| memory_delete | 删除指定便签（压缩后清理用） |
+| 工具            | 功能                                                        |
+| --------------- | ----------------------------------------------------------- |
+| memory_setup    | 自动检测或手动指定 agent 类型，将记忆管理提示词注入配置文件 |
+| memory_save     | 保存记忆便签到 Markdown 文件 + 向量索引，超阈值时提示压缩   |
+| memory_search   | 语义相似度检索，支持 top_k 和 source 过滤                   |
+| memory_compress | 返回所有便签供 LLM 蒸馏，或统计标签分布                     |
+| memory_delete   | 删除指定便签（压缩后清理用）                                |
 
 ### 关键实现细节
 
@@ -59,6 +59,7 @@ mnemo/
 ### 数据存储
 
 默认路径：`~/.mnemo/memory/`
+
 - `notes/` - Markdown 便签文件
 - `index/` - vectra 向量索引
 
