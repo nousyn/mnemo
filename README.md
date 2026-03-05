@@ -93,7 +93,7 @@ OpenClaw uses [mcporter](https://github.com/steipete/mcporter) to manage MCP ser
 Or via mcporter CLI:
 
 ```bash
-mcporter config add mnemo -- mnemo
+mcporter config add mnemo --command mnemo --scope home
 ```
 
 </details>

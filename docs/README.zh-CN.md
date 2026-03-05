@@ -91,7 +91,7 @@ OpenClaw 使用 [mcporter](https://github.com/steipete/mcporter) 管理 MCP 服�
 或通过 mcporter CLI：
 
 ```bash
-mcporter config add mnemo -- mnemo
+mcporter config add mnemo --command mnemo --scope home
 ```
 
 </details>
