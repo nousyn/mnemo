@@ -24,6 +24,7 @@ You have access to a persistent memory system (Mnemo). Use it to retain importan
 - When you notice the conversation has generated many memory notes
 - When explicitly asked to organize or clean up memories
 - Periodically during long conversations
+- Workflow: call memory_compress to get all notes → distill them into fewer, concise notes → call memory_compress_apply with the distilled notes and old IDs to atomically save new + delete old
 
 ### Guidelines:
 

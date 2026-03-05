@@ -103,7 +103,7 @@ export function registerCompressTool(server: McpServer): void {
                     content: [
                         {
                             type: 'text' as const,
-                            text: `Found ${targetNotes.length} memories to compress (${Math.round(stats.totalSize / 1000)}KB total).\n\nPlease review the following memories and distill them into fewer, more concise notes. After reviewing, use memory_save to save the compressed versions, then use memory_delete to remove the originals.\n\nOriginal note IDs to delete after compression: [${noteIds.join(', ')}]\n\n---\n\n${notesText}`,
+                            text: `Found ${targetNotes.length} memories to compress (${Math.round(stats.totalSize / 1000)}KB total).\n\nPlease review the following memories and distill them into fewer, more concise notes. After reviewing, use memory_compress_apply to submit the compressed versions — it will atomically save the new notes and delete the originals.\n\nOriginal note IDs to delete after compression: [${noteIds.join(', ')}]\n\n---\n\n${notesText}`,
                         },
                     ],
                 };
@@ -121,7 +121,7 @@ export function registerCompressTool(server: McpServer): void {
         },
     );
 
-    // Register the delete tool (used during compression)
+    // Register the delete tool
     server.registerTool(
         'memory_delete',
         {
@@ -154,6 +154,78 @@ export function registerCompressTool(server: McpServer): void {
                         {
                             type: 'text' as const,
                             text: `Failed to delete memories: ${error instanceof Error ? error.message : String(error)}`,
+                        },
+                    ],
+                    isError: true,
+                };
+            }
+        },
+    );
+
+    // Register the compress_apply tool (atomic save new + delete old)
+    server.registerTool(
+        'memory_compress_apply',
+        {
+            title: 'Apply Compression',
+            description:
+                'Atomically apply memory compression results. Saves the distilled notes and deletes the originals in one operation. Use this after memory_compress returns notes for review — distill them and submit the results here.',
+            inputSchema: {
+                notes: z
+                    .array(
+                        z.object({
+                            content: z.string().describe('The distilled note content'),
+                            tags: z.array(z.string()).optional().describe('Tags for this note'),
+                        }),
+                    )
+                    .describe('Array of distilled notes to save'),
+                old_ids: z
+                    .array(z.string())
+                    .describe('IDs of the original notes to delete (from memory_compress output)'),
+                source: z.string().optional().describe("Source identifier, defaults to 'unknown'"),
+            },
+        },
+        async ({ notes, old_ids, source }) => {
+            try {
+                // Step 1: Save all new notes
+                const savedNotes = [];
+                for (const n of notes) {
+                    const saved = await saveNote(n.content, n.tags || [], source || 'unknown');
+                    savedNotes.push(saved);
+                }
+
+                // Step 2: Index new notes
+                const indexWarnings: string[] = [];
+                for (const saved of savedNotes) {
+                    try {
+                        await indexNote(saved);
+                    } catch (err) {
+                        const reason = err instanceof Error ? err.message : String(err);
+                        indexWarnings.push(`${saved.meta.id}: ${reason}`);
+                    }
+                }
+
+                // Step 3: Remove old notes from index
+                await removeMultipleFromIndex(old_ids);
+
+                // Step 4: Delete old notes from disk
+                const deletedCount = await deleteNotes(old_ids);
+
+                const newIds = savedNotes.map((n) => n.meta.id);
+                let result = `Compression applied successfully.\n\n- New notes saved: ${savedNotes.length} [${newIds.join(', ')}]\n- Old notes deleted: ${deletedCount} of ${old_ids.length}`;
+
+                if (indexWarnings.length > 0) {
+                    result += `\n\nWarning: Some notes could not be indexed (will be available after embedding model loads):\n${indexWarnings.join('\n')}`;
+                }
+
+                return {
+                    content: [{ type: 'text' as const, text: result }],
+                };
+            } catch (error) {
+                return {
+                    content: [
+                        {
+                            type: 'text' as const,
+                            text: `Failed to apply compression: ${error instanceof Error ? error.message : String(error)}`,
                         },
                     ],
                     isError: true,

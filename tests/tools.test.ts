@@ -49,10 +49,17 @@ function getResponseText(result: any): string {
 }
 
 describe('tools/list', () => {
-    it('应该列出所有 5 个工具', async () => {
+    it('应该列出所有 6 个工具', async () => {
         const { tools } = await client.listTools();
         const names = tools.map((t) => t.name).sort();
-        expect(names).toEqual(['memory_compress', 'memory_delete', 'memory_save', 'memory_search', 'memory_setup']);
+        expect(names).toEqual([
+            'memory_compress',
+            'memory_compress_apply',
+            'memory_delete',
+            'memory_save',
+            'memory_search',
+            'memory_setup',
+        ]);
     });
 });
 
@@ -146,8 +153,8 @@ describe('memory_compress 工具', () => {
 
         const text = getResponseText(result);
         expect(text).toContain('memories to compress');
-        expect(text).toContain('memory_save');
-        expect(text).toContain('memory_delete');
+        expect(text).toContain('memory_compress_apply');
+        expect(text).toContain('Original note IDs to delete');
     });
 
     it('auto_tag 策略应返回标签统计', async () => {
@@ -204,6 +211,75 @@ describe('memory_delete 工具', () => {
 
         const text = getResponseText(result);
         expect(text).toContain('Deleted 0 of 1');
+    });
+});
+
+describe('memory_compress_apply 工具', () => {
+    it('应该原子性地保存新笔记并删除旧笔记', async () => {
+        // 先保存两条笔记
+        const save1 = await client.callTool({
+            name: 'memory_save',
+            arguments: { content: '压缩测试笔记 A', tags: ['compress-test'], source: 'opencode' },
+        });
+        const save2 = await client.callTool({
+            name: 'memory_save',
+            arguments: { content: '压缩测试笔记 B', tags: ['compress-test'], source: 'opencode' },
+        });
+
+        const id1 = getResponseText(save1).match(/ID: ([\w-]+)/)?.[1];
+        const id2 = getResponseText(save2).match(/ID: ([\w-]+)/)?.[1];
+        expect(id1).toBeTruthy();
+        expect(id2).toBeTruthy();
+
+        // 用 compress_apply 把两条蒸馏成一条
+        const result = await client.callTool({
+            name: 'memory_compress_apply',
+            arguments: {
+                notes: [{ content: '蒸馏后的合并笔记 AB', tags: ['compressed'] }],
+                old_ids: [id1!, id2!],
+                source: 'opencode',
+            },
+        });
+
+        const text = getResponseText(result);
+        expect(text).toContain('Compression applied successfully');
+        expect(text).toContain('New notes saved: 1');
+        expect(text).toContain('Old notes deleted: 2 of 2');
+    });
+
+    it('旧 ID 不存在时也应成功（删除 0 条）', async () => {
+        const result = await client.callTool({
+            name: 'memory_compress_apply',
+            arguments: {
+                notes: [{ content: '新笔记', tags: ['test'] }],
+                old_ids: ['nonexistent-id-1', 'nonexistent-id-2'],
+                source: 'opencode',
+            },
+        });
+
+        const text = getResponseText(result);
+        expect(text).toContain('Compression applied successfully');
+        expect(text).toContain('New notes saved: 1');
+        expect(text).toContain('Old notes deleted: 0 of 2');
+    });
+
+    it('应该可以保存多条蒸馏笔记', async () => {
+        const result = await client.callTool({
+            name: 'memory_compress_apply',
+            arguments: {
+                notes: [
+                    { content: '蒸馏笔记 1', tags: ['a'] },
+                    { content: '蒸馏笔记 2', tags: ['b'] },
+                    { content: '蒸馏笔记 3', tags: ['c'] },
+                ],
+                old_ids: [],
+                source: 'opencode',
+            },
+        });
+
+        const text = getResponseText(result);
+        expect(text).toContain('New notes saved: 3');
+        expect(text).toContain('Old notes deleted: 0 of 0');
     });
 });
 
