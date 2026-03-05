@@ -19,7 +19,7 @@ Mnemo solves the problem of context window overflow — important decisions, use
 ### Install
 
 ```bash
-npm install -g mnemo
+npm install -g @s_s/mnemo
 ```
 
 ### Configure your MCP client
