@@ -18,6 +18,7 @@ set -euo pipefail
 #   7. 版本号写入 + commit + tag
 #   8. npm publish
 #   9. git push
+#  10. 同步分支
 # ─────────────────────────────────────────────
 
 # Colors
@@ -50,6 +51,7 @@ while [[ $# -gt 0 ]]; do
             echo "  7  版本号写入 + commit + tag"
             echo "  8  npm publish"
             echo "  9  git push"
+            echo "  10 同步分支"
             exit 0
             ;;
         *)
@@ -61,7 +63,7 @@ done
 
 # Step counter
 STEP=0
-TOTAL_STEPS=9
+TOTAL_STEPS=10
 
 step() {
     STEP=$((STEP + 1))
@@ -242,12 +244,39 @@ if step "git push"; then
 fi
 
 # ─────────────────────────────────────────────
+# Step 10: 同步分支
+# ─────────────────────────────────────────────
+if step "同步分支"; then
+    if [ "$BRANCH" = "main" ]; then
+        git checkout develop
+        git merge main
+        git push origin develop
+        success "已合并 main → develop，当前在 develop 分支"
+    elif [ "$BRANCH" = "develop" ]; then
+        git checkout main
+        git merge develop
+        git push origin main
+        git checkout develop
+        success "已合并 develop → main，当前在 develop 分支"
+    else
+        git checkout main
+        git merge "$BRANCH"
+        git push origin main
+        git checkout develop
+        git merge "$BRANCH"
+        git push origin develop
+        success "已合并 ${BRANCH} → main + develop，当前在 develop 分支"
+    fi
+fi
+
+# ─────────────────────────────────────────────
 # Done
 # ─────────────────────────────────────────────
 FINAL_VERSION=$(node -p "require('./package.json').version")
+FINAL_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 echo ""
 echo -e "${GREEN}${BOLD}发布成功！${RESET}"
 echo -e "  版本: ${BOLD}v${FINAL_VERSION}${RESET}"
-echo -e "  分支: ${BRANCH}"
+echo -e "  分支: ${FINAL_BRANCH}"
 echo -e "  npm:  https://www.npmjs.com/package/@s_s/mnemo"
 echo ""
