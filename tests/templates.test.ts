@@ -34,6 +34,14 @@ describe('getPromptBlock', () => {
         expect(block).toContain('continuity thread');
     });
 
+    it('应该包含保存阈值与去重引导', () => {
+        const block = getPromptBlock();
+        expect(block).toContain('meets at least 2 of these 3 criteria');
+        expect(block).toContain('useful across future sessions');
+        expect(block).toContain('similar memory already exists');
+        expect(block).toContain('updating or replacing existing memories');
+    });
+
     it('无 agentType 时应只包含 base prompt', () => {
         const block = getPromptBlock();
         expect(block).not.toContain('OpenClaw Integration');
