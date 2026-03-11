@@ -52,10 +52,11 @@ describe('getPromptBlock', () => {
         expect(block).toContain('→ type: experience');
     });
 
-    it('Guidelines 应包含分类指引', () => {
+    it('Guidelines 应包含强制分类指引', () => {
         const block = getPromptBlock();
-        expect(block).toContain('Classify each memory with a type before saving');
-        expect(block).toContain('preference, profile, goal, continuity, fact, decision, rule, or experience');
+        expect(block).toContain('Always specify a type when saving');
+        expect(block).toContain('Determine the type first');
+        expect(block).toContain('Saving without a type defeats the purpose');
     });
 
     it('无 agentType 时应只包含 base prompt', () => {

@@ -51,7 +51,7 @@ Mnemo is not a full transcript archive. It is a system for preserving high-value
 - Prefer this order: memory_search -> do the work -> memory_save -> memory_compress when needed
 - Before saving, verify the information meets at least 2 of these 3 criteria: (1) useful across future sessions, (2) affects future work or decisions, (3) would require re-alignment if forgotten
 - Before saving new content, check if a similar memory already exists. Prefer updating or replacing existing memories over creating duplicates.
-- Classify each memory with a type before saving: preference, profile, goal, continuity, fact, decision, rule, or experience
+- **Always specify a type when saving.** Determine the type first (preference, profile, goal, continuity, fact, decision, rule, or experience), then call memory_save with the type parameter. Saving without a type defeats the purpose of organized long-term memory.
 - Save memories in concise, distilled form - capture the essence, not raw conversation
 - Do not save routine task state, ordinary command output, or one-off debugging noise
 - Use descriptive tags to categorize memories
