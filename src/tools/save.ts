@@ -2,7 +2,7 @@ import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { saveNote, getNoteStats } from '../core/notes.js';
 import { indexNote, isEmbeddingReady } from '../core/embedding.js';
-import { COMPRESS_THRESHOLDS } from '../core/config.js';
+import { COMPRESS_THRESHOLDS, MEMORY_TYPES } from '../core/config.js';
 
 /**
  * Register the memory_save tool
@@ -20,6 +20,12 @@ export function registerSaveTool(server: McpServer): void {
                     .describe(
                         'The long-term context to save. It should capture the durable essence of what should still matter in future conversations.',
                     ),
+                type: z
+                    .enum(MEMORY_TYPES)
+                    .optional()
+                    .describe(
+                        'Memory type classification. Helps organize and retrieve memories. Options: preference (user preferences/habits), profile (stable background info), goal (long-term directions), continuity (unresolved threads to resume), fact (stable objective info), decision (confirmed choices), rule (reusable conventions), experience (validated reusable lessons).',
+                    ),
                 tags: z
                     .array(z.string())
                     .optional()
@@ -32,10 +38,10 @@ export function registerSaveTool(server: McpServer): void {
                     .describe("Source identifier, e.g., 'opencode', 'claude-code'. Defaults to 'unknown'."),
             },
         },
-        async ({ content, tags, source }) => {
+        async ({ content, type, tags, source }) => {
             try {
                 // Save the note to disk first (fast, reliable)
-                const note = await saveNote(content, tags || [], source || 'unknown');
+                const note = await saveNote(content, tags || [], source || 'unknown', type);
 
                 // Try to index for semantic search (may be slow on first call)
                 let indexWarning = '';
@@ -47,6 +53,13 @@ export function registerSaveTool(server: McpServer): void {
                     console.error('Mnemo: indexing failed for note', note.meta.id, reason);
                 }
 
+                // Soft hint if type was not specified
+                let typeHint = '';
+                if (!type) {
+                    typeHint =
+                        '\n\nHint: Consider specifying a memory type (preference, profile, goal, continuity, fact, decision, rule, experience) for better organization and retrieval.';
+                }
+
                 // Check if compression might be needed (program-level guardrail)
                 const stats = await getNoteStats();
                 let compressHint = '';
@@ -55,11 +68,13 @@ export function registerSaveTool(server: McpServer): void {
                     compressHint = `\n\nNote: Memory storage is growing large (${stats.count} notes, ${Math.round(stats.totalSize / 1000)}KB). Consider running memory_compress to consolidate and distill older memories.`;
                 }
 
+                const typeLine = note.meta.type ? `\nType: ${note.meta.type}` : '';
+
                 return {
                     content: [
                         {
                             type: 'text' as const,
-                            text: `Memory saved successfully.\n\nID: ${note.meta.id}\nTags: [${note.meta.tags.join(', ')}]${indexWarning}${compressHint}`,
+                            text: `Memory saved successfully.\n\nID: ${note.meta.id}${typeLine}\nTags: [${note.meta.tags.join(', ')}]${indexWarning}${typeHint}${compressHint}`,
                         },
                     ],
                 };

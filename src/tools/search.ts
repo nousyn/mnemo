@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { searchNotes, isEmbeddingReady } from '../core/embedding.js';
+import { MEMORY_TYPES } from '../core/config.js';
 
 /**
  * Extract a summary from note content: first line, or first ~200 chars.
@@ -45,12 +46,19 @@ export function registerSearchTool(server: McpServer): void {
                     .describe(
                         'Filter results to only include notes that have ALL of the specified tags. E.g., ["architecture", "decision"]',
                     ),
+                type_filter: z
+                    .enum(MEMORY_TYPES)
+                    .optional()
+                    .describe(
+                        'Filter results to only include notes of a specific memory type. E.g., "decision", "rule", "continuity".',
+                    ),
             },
         },
-        async ({ query, top_k, source_filter, tag_filter }) => {
+        async ({ query, top_k, source_filter, tag_filter, type_filter }) => {
             try {
-                // When tag_filter is used, fetch more results to compensate for post-filtering
-                const fetchK = tag_filter && tag_filter.length > 0 ? (top_k || 5) * 3 : top_k || 5;
+                // When tag_filter or type_filter is used, fetch more results to compensate for post-filtering
+                const hasPostFilter = (tag_filter && tag_filter.length > 0) || type_filter;
+                const fetchK = hasPostFilter ? (top_k || 5) * 3 : top_k || 5;
                 let results = await searchNotes(query, fetchK, source_filter);
 
                 // Post-filter by tags if specified
@@ -59,6 +67,12 @@ export function registerSearchTool(server: McpServer): void {
                         const noteTags = r.tags.split(',').filter(Boolean);
                         return tag_filter.every((t) => noteTags.includes(t));
                     });
+                    results = results.slice(0, top_k || 5);
+                }
+
+                // Post-filter by type if specified
+                if (type_filter) {
+                    results = results.filter((r) => r.type === type_filter);
                     results = results.slice(0, top_k || 5);
                 }
 
@@ -79,6 +93,7 @@ export function registerSearchTool(server: McpServer): void {
                         (r, i) =>
                             `### Memory ${i + 1} (relevance: ${(r.score * 100).toFixed(1)}%)\n` +
                             `- **ID:** ${r.id}\n` +
+                            (r.type ? `- **Type:** ${r.type}\n` : '') +
                             `- **Tags:** [${r.tags}]\n` +
                             `- **Source:** ${r.source}\n` +
                             `- **Created:** ${r.created}\n` +

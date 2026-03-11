@@ -12,13 +12,13 @@ Mnemo is not a full transcript archive. It is a system for preserving high-value
 
 ### When to save memory (memory_save):
 - Save only high-value long-term context, not temporary details or full conversation logs
-- Save when the user expresses a stable preference, working style, boundary, or requirement
-- Save when a decision is clearly made and will affect future work
-- Save when a long-term goal or direction is clarified
-- Save when an important continuity thread is opened that must be resumed later
-- Save when a reusable rule or workflow convention is established
-- Save a validated high-value experience only when it is likely to matter again across future conversations
-- Before saving, prefer asking yourself whether the information will still matter in a future session
+- Save when the user expresses a stable preference, working style, boundary, or requirement → type: preference
+- Save when a decision is clearly made and will affect future work → type: decision
+- Save when a long-term goal or direction is clarified → type: goal
+- Save when an important continuity thread is opened that must be resumed later → type: continuity
+- Save when a reusable rule or workflow convention is established → type: rule
+- Save stable background information about the user, project, or topic → type: profile or fact
+- Save a validated high-value experience only when it is likely to matter again across future conversations → type: experience
 
 ### When to initialize memory (memory_setup):
 - When Mnemo has not been initialized yet and a memory tool reports that setup is required
@@ -51,6 +51,7 @@ Mnemo is not a full transcript archive. It is a system for preserving high-value
 - Prefer this order: memory_search -> do the work -> memory_save -> memory_compress when needed
 - Before saving, verify the information meets at least 2 of these 3 criteria: (1) useful across future sessions, (2) affects future work or decisions, (3) would require re-alignment if forgotten
 - Before saving new content, check if a similar memory already exists. Prefer updating or replacing existing memories over creating duplicates.
+- Classify each memory with a type before saving: preference, profile, goal, continuity, fact, decision, rule, or experience
 - Save memories in concise, distilled form - capture the essence, not raw conversation
 - Do not save routine task state, ordinary command output, or one-off debugging noise
 - Use descriptive tags to categorize memories

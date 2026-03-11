@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { readAllNotes, saveNote, deleteNotes, getNoteStats } from '../core/notes.js';
 import { indexNote, removeMultipleFromIndex } from '../core/embedding.js';
+import { MEMORY_TYPES } from '../core/config.js';
 
 /**
  * Register the memory_compress tool
@@ -93,7 +94,7 @@ export function registerCompressTool(server: McpServer): void {
                 const notesText = targetNotes
                     .map(
                         (n) =>
-                            `[ID: ${n.meta.id}] [Tags: ${n.meta.tags.join(', ')}] [Created: ${n.meta.created}]\n${n.content}`,
+                            `[ID: ${n.meta.id}]${n.meta.type ? ` [Type: ${n.meta.type}]` : ''} [Tags: ${n.meta.tags.join(', ')}] [Created: ${n.meta.created}]\n${n.content}`,
                     )
                     .join('\n\n---\n\n');
 
@@ -175,6 +176,7 @@ export function registerCompressTool(server: McpServer): void {
                         z.object({
                             content: z.string().describe('The distilled note content'),
                             tags: z.array(z.string()).optional().describe('Tags for this note'),
+                            type: z.enum(MEMORY_TYPES).optional().describe('Memory type classification for this note'),
                         }),
                     )
                     .describe('Array of distilled notes to save'),
@@ -189,7 +191,7 @@ export function registerCompressTool(server: McpServer): void {
                 // Step 1: Save all new notes
                 const savedNotes = [];
                 for (const n of notes) {
-                    const saved = await saveNote(n.content, n.tags || [], source || 'unknown');
+                    const saved = await saveNote(n.content, n.tags || [], source || 'unknown', n.type);
                     savedNotes.push(saved);
                 }
 

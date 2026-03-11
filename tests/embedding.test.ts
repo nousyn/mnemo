@@ -84,6 +84,30 @@ describe('indexNote / searchNotes / removeFromIndex', () => {
         await removeFromIndex(note.meta.id);
     });
 
+    it('搜索结果应包含 type 字段', async () => {
+        const note = await saveNote('type 索引测试', ['emb-type'], 'opencode', 'decision');
+        await indexNote(note);
+
+        const results = await searchNotes('type 索引测试', 5);
+        const found = results.find((r) => r.id === note.meta.id);
+        expect(found).toBeDefined();
+        expect(found!.type).toBe('decision');
+
+        await removeFromIndex(note.meta.id);
+    });
+
+    it('无 type 的笔记搜索结果 type 应为空字符串', async () => {
+        const note = await saveNote('无 type 索引测试 embNoType', ['emb-type'], 'opencode');
+        await indexNote(note);
+
+        const results = await searchNotes('embNoType', 5);
+        const found = results.find((r) => r.id === note.meta.id);
+        expect(found).toBeDefined();
+        expect(found!.type).toBe('');
+
+        await removeFromIndex(note.meta.id);
+    });
+
     it('source_filter 应该过滤结果', async () => {
         const n1 = await saveNote('来自 opencode 的笔记', ['test'], 'opencode');
         const n2 = await saveNote('来自 claude 的笔记', ['test'], 'claude-code');

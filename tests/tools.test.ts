@@ -109,6 +109,40 @@ describe('memory_save 工具', () => {
         const text = getResponseText(result);
         expect(text).toContain('Memory saved successfully');
     });
+
+    it('指定 type 应保存并显示类型', async () => {
+        const result = await client.callTool({
+            name: 'memory_save',
+            arguments: {
+                content: '架构决策：使用 MCP 作为通信协议',
+                type: 'decision',
+                tags: ['architecture'],
+                source: 'opencode',
+            },
+        });
+
+        const text = getResponseText(result);
+        expect(text).toContain('Memory saved successfully');
+        expect(text).toContain('Type: decision');
+        // 不应包含 type hint
+        expect(text).not.toContain('Consider specifying a memory type');
+    });
+
+    it('未指定 type 时应返回 soft hint', async () => {
+        const result = await client.callTool({
+            name: 'memory_save',
+            arguments: {
+                content: '无类型的保存测试 notype_hint_test',
+                tags: ['test'],
+                source: 'opencode',
+            },
+        });
+
+        const text = getResponseText(result);
+        expect(text).toContain('Memory saved successfully');
+        expect(text).toContain('Consider specifying a memory type');
+        expect(text).not.toContain('Type:');
+    });
 });
 
 describe('memory_search 工具', () => {
@@ -199,6 +233,66 @@ describe('memory_search 工具', () => {
         const text = getResponseText(result);
         expect(text).toContain('No relevant memories found');
     });
+
+    it('type_filter 应该按类型过滤结果', async () => {
+        // 保存一条 decision 类型的笔记
+        await client.callTool({
+            name: 'memory_save',
+            arguments: {
+                content: 'type_filter 测试：选择 PostgreSQL 作为数据库 typeFilterPgTest',
+                type: 'decision',
+                tags: ['type-filter-test'],
+                source: 'opencode',
+            },
+        });
+        // 保存一条 rule 类型的笔记
+        await client.callTool({
+            name: 'memory_save',
+            arguments: {
+                content: 'type_filter 测试：所有 SQL 查询必须参数化 typeFilterSqlRule',
+                type: 'rule',
+                tags: ['type-filter-test'],
+                source: 'opencode',
+            },
+        });
+
+        // 用 type_filter=decision 搜索
+        const result = await client.callTool({
+            name: 'memory_search',
+            arguments: {
+                query: 'typeFilterPgTest typeFilterSqlRule',
+                top_k: 10,
+                type_filter: 'decision',
+            },
+        });
+
+        const text = getResponseText(result);
+        expect(text).toContain('typeFilterPgTest');
+        expect(text).not.toContain('typeFilterSqlRule');
+    });
+
+    it('搜索结果有 type 时应显示 Type 字段', async () => {
+        await client.callTool({
+            name: 'memory_save',
+            arguments: {
+                content: 'type 显示测试 typeDisplaySearchTest',
+                type: 'preference',
+                tags: ['type-display-test'],
+                source: 'opencode',
+            },
+        });
+
+        const result = await client.callTool({
+            name: 'memory_search',
+            arguments: {
+                query: 'typeDisplaySearchTest',
+                top_k: 5,
+            },
+        });
+
+        const text = getResponseText(result);
+        expect(text).toContain('**Type:** preference');
+    });
 });
 
 describe('memory_get 工具', () => {
@@ -280,6 +374,30 @@ describe('memory_get 工具', () => {
         expect(text).toContain('gamma');
         expect(text).toContain('nonexistent-xyz');
     });
+
+    it('有 type 的笔记应显示 Type 字段', async () => {
+        const saveResult = await client.callTool({
+            name: 'memory_save',
+            arguments: {
+                content: 'get type 显示测试 getTypeDisplay',
+                type: 'fact',
+                tags: ['get-type-test'],
+                source: 'opencode',
+            },
+        });
+
+        const id = getResponseText(saveResult).match(/ID: ([\w-]+)/)?.[1];
+        expect(id).toBeTruthy();
+
+        const getResult = await client.callTool({
+            name: 'memory_get',
+            arguments: { ids: [id!] },
+        });
+
+        const text = getResponseText(getResult);
+        expect(text).toContain('getTypeDisplay');
+        expect(text).toContain('**Type:** fact');
+    });
 });
 
 describe('memory_compress 工具', () => {
@@ -315,6 +433,28 @@ describe('memory_compress 工具', () => {
 
         const text = getResponseText(result);
         expect(text).toContain('No memories older than');
+    });
+
+    it('review 输出应包含有 type 的笔记的类型信息', async () => {
+        // 先保存一条有 type 的笔记
+        await client.callTool({
+            name: 'memory_save',
+            arguments: {
+                content: 'compress type 显示测试 compressTypeDisplay',
+                type: 'goal',
+                tags: ['compress-type-test'],
+                source: 'opencode',
+            },
+        });
+
+        const result = await client.callTool({
+            name: 'memory_compress',
+            arguments: { strategy: 'review' },
+        });
+
+        const text = getResponseText(result);
+        expect(text).toContain('compressTypeDisplay');
+        expect(text).toContain('[Type: goal]');
     });
 });
 
@@ -418,6 +558,32 @@ describe('memory_compress_apply 工具', () => {
         const text = getResponseText(result);
         expect(text).toContain('New notes saved: 3');
         expect(text).toContain('Old notes deleted: 0 of 0');
+    });
+
+    it('蒸馏笔记应支持 type 字段', async () => {
+        const save1 = await client.callTool({
+            name: 'memory_save',
+            arguments: { content: 'compress_apply type 测试原始笔记', tags: ['ca-type'], source: 'opencode' },
+        });
+        const id1 = getResponseText(save1).match(/ID: ([\w-]+)/)?.[1];
+        expect(id1).toBeTruthy();
+
+        const result = await client.callTool({
+            name: 'memory_compress_apply',
+            arguments: {
+                notes: [
+                    { content: '蒸馏后的决策笔记', tags: ['compressed'], type: 'decision' },
+                    { content: '蒸馏后的规则笔记', tags: ['compressed'], type: 'rule' },
+                ],
+                old_ids: [id1!],
+                source: 'opencode',
+            },
+        });
+
+        const text = getResponseText(result);
+        expect(text).toContain('Compression applied successfully');
+        expect(text).toContain('New notes saved: 2');
+        expect(text).toContain('Old notes deleted: 1 of 1');
     });
 });
 

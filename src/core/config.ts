@@ -11,6 +11,23 @@ export type AgentType = (typeof AGENT_TYPES)[number];
 
 export type StorageScope = 'global' | 'project';
 
+/**
+ * Memory type categories for the minimal constraint mechanism.
+ * Each memory should be classified into one of these types before saving.
+ */
+export const MEMORY_TYPES = [
+    'preference',
+    'profile',
+    'goal',
+    'continuity',
+    'fact',
+    'decision',
+    'rule',
+    'experience',
+] as const;
+
+export type MemoryType = (typeof MEMORY_TYPES)[number];
+
 export interface StorageContext {
     scope: StorageScope;
     dataDir: string;
@@ -183,6 +200,7 @@ export interface NoteMeta {
     updated: string;
     tags: string[];
     source: string;
+    type?: MemoryType;
 }
 
 /**

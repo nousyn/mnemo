@@ -42,6 +42,22 @@ describe('getPromptBlock', () => {
         expect(block).toContain('updating or replacing existing memories');
     });
 
+    it('save 触发条件应标注建议的 type', () => {
+        const block = getPromptBlock();
+        expect(block).toContain('→ type: preference');
+        expect(block).toContain('→ type: decision');
+        expect(block).toContain('→ type: goal');
+        expect(block).toContain('→ type: continuity');
+        expect(block).toContain('→ type: rule');
+        expect(block).toContain('→ type: experience');
+    });
+
+    it('Guidelines 应包含分类指引', () => {
+        const block = getPromptBlock();
+        expect(block).toContain('Classify each memory with a type before saving');
+        expect(block).toContain('preference, profile, goal, continuity, fact, decision, rule, or experience');
+    });
+
     it('无 agentType 时应只包含 base prompt', () => {
         const block = getPromptBlock();
         expect(block).not.toContain('OpenClaw Integration');

@@ -10,6 +10,7 @@ import {
     getProjectConfigPath,
     writeStorageConfig,
     resolveStorageContext,
+    MEMORY_TYPES,
 } from '../src/core/config.js';
 
 let originalEnv: NodeJS.ProcessEnv;
@@ -105,5 +106,23 @@ describe('resolveStorageContext', () => {
         await fs.mkdir(workDir, { recursive: true });
 
         await expect(resolveStorageContext(workDir)).rejects.toThrow('Run memory_setup first');
+    });
+});
+
+describe('MEMORY_TYPES', () => {
+    it('应该导出 8 种记忆类型', () => {
+        expect(MEMORY_TYPES).toHaveLength(8);
+    });
+
+    it('应该包含所有预期的类型', () => {
+        const expected = ['preference', 'profile', 'goal', 'continuity', 'fact', 'decision', 'rule', 'experience'];
+        expect([...MEMORY_TYPES]).toEqual(expected);
+    });
+
+    it('应该是 readonly 数组（编译时类型约束）', () => {
+        // as const 在 TypeScript 编译时约束为 readonly，运行时仍是普通数组
+        // 验证它确实是一个数组且内容固定
+        expect(Array.isArray(MEMORY_TYPES)).toBe(true);
+        expect(MEMORY_TYPES).toHaveLength(8);
     });
 });

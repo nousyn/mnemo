@@ -12,7 +12,7 @@ import {
     deleteNotes,
     getNoteStats,
 } from '../src/core/notes.js';
-import { writeStorageConfig, type Note } from '../src/core/config.js';
+import { writeStorageConfig, type Note, MEMORY_TYPES } from '../src/core/config.js';
 
 let tmpDir: string;
 
@@ -96,6 +96,56 @@ source: opencode
         expect(note).not.toBeNull();
         expect(note!.content).toBe('键值对: value: nested: deep');
     });
+
+    it('应该正确解析带 type 的笔记', () => {
+        const raw = `---
+id: typed1234
+created: 2026-01-01T00:00:00.000Z
+updated: 2026-01-01T00:00:00.000Z
+tags: [test]
+source: opencode
+type: decision
+---
+
+带类型的笔记`;
+
+        const note = parseNote(raw);
+        expect(note).not.toBeNull();
+        expect(note!.meta.type).toBe('decision');
+    });
+
+    it('无 type 时 meta.type 应为 undefined（向后兼容）', () => {
+        const raw = `---
+id: notype123
+created: 2026-01-01T00:00:00.000Z
+updated: 2026-01-01T00:00:00.000Z
+tags: []
+source: opencode
+---
+
+无类型笔记`;
+
+        const note = parseNote(raw);
+        expect(note).not.toBeNull();
+        expect(note!.meta.type).toBeUndefined();
+    });
+
+    it('无效 type 值应被忽略', () => {
+        const raw = `---
+id: badtype123
+created: 2026-01-01T00:00:00.000Z
+updated: 2026-01-01T00:00:00.000Z
+tags: []
+source: opencode
+type: invalid_type
+---
+
+无效类型笔记`;
+
+        const note = parseNote(raw);
+        expect(note).not.toBeNull();
+        expect(note!.meta.type).toBeUndefined();
+    });
 });
 
 describe('serializeNote', () => {
@@ -138,6 +188,61 @@ describe('serializeNote', () => {
         expect(parsed!.meta.source).toBe(note.meta.source);
         expect(parsed!.content).toBe(note.content);
     });
+
+    it('带 type 时应正确序列化', () => {
+        const note: Note = {
+            meta: {
+                id: 'typed1234',
+                created: '2026-01-01T00:00:00.000Z',
+                updated: '2026-01-01T00:00:00.000Z',
+                tags: ['arch'],
+                source: 'opencode',
+                type: 'decision',
+            },
+            content: '决策内容',
+        };
+
+        const result = serializeNote(note);
+        expect(result).toContain('type: decision');
+        expect(result).toContain('决策内容');
+    });
+
+    it('无 type 时序列化不应包含 type 行', () => {
+        const note: Note = {
+            meta: {
+                id: 'notype123',
+                created: '2026-01-01T00:00:00.000Z',
+                updated: '2026-01-01T00:00:00.000Z',
+                tags: [],
+                source: 'opencode',
+            },
+            content: '无类型内容',
+        };
+
+        const result = serializeNote(note);
+        expect(result).not.toContain('type:');
+    });
+
+    it('带 type 时 parse 和 serialize 应该互逆', () => {
+        const note: Note = {
+            meta: {
+                id: 'roundtype',
+                created: '2026-01-01T00:00:00.000Z',
+                updated: '2026-01-02T00:00:00.000Z',
+                tags: ['test'],
+                source: 'opencode',
+                type: 'rule',
+            },
+            content: '规则往返测试',
+        };
+
+        const serialized = serializeNote(note);
+        const parsed = parseNote(serialized);
+        expect(parsed).not.toBeNull();
+        expect(parsed!.meta.type).toBe('rule');
+        expect(parsed!.meta.id).toBe(note.meta.id);
+        expect(parsed!.content).toBe(note.content);
+    });
 });
 
 describe('saveNote / readNote', () => {
@@ -167,6 +272,27 @@ describe('saveNote / readNote', () => {
         const note = await saveNote('测试默认值');
         expect(note.meta.source).toBe('unknown');
         expect(note.meta.tags).toEqual([]);
+    });
+
+    it('应该保存带 type 的笔记', async () => {
+        const note = await saveNote('决策测试', ['arch'], 'opencode', 'decision');
+
+        expect(note.meta.type).toBe('decision');
+        expect(note.content).toBe('决策测试');
+
+        // 从磁盘读回验证 type 持久化
+        const read = await readNote(note.meta.id);
+        expect(read).not.toBeNull();
+        expect(read!.meta.type).toBe('decision');
+    });
+
+    it('不传 type 时 meta.type 应为 undefined', async () => {
+        const note = await saveNote('无类型保存');
+        expect(note.meta.type).toBeUndefined();
+
+        const read = await readNote(note.meta.id);
+        expect(read).not.toBeNull();
+        expect(read!.meta.type).toBeUndefined();
     });
 });
 

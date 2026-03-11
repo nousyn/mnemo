@@ -24,6 +24,7 @@ export function registerGetTool(server: McpServer): void {
                     tags: string[];
                     source: string;
                     created: string;
+                    type?: string;
                 }> = [];
                 const notFound: string[] = [];
 
@@ -36,6 +37,7 @@ export function registerGetTool(server: McpServer): void {
                             tags: note.meta.tags,
                             source: note.meta.source,
                             created: note.meta.created,
+                            type: note.meta.type,
                         });
                     } else {
                         notFound.push(id);
@@ -58,6 +60,7 @@ export function registerGetTool(server: McpServer): void {
                         (r, i) =>
                             `### Memory ${i + 1}\n` +
                             `- **ID:** ${r.id}\n` +
+                            (r.type ? `- **Type:** ${r.type}\n` : '') +
                             `- **Tags:** [${r.tags.join(', ')}]\n` +
                             `- **Source:** ${r.source}\n` +
                             `- **Created:** ${r.created}\n\n` +

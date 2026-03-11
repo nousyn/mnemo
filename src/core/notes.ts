@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { ensureDir, resolveStorageContext, type Note, type NoteMeta } from './config.js';
+import { ensureDir, resolveStorageContext, type Note, type NoteMeta, type MemoryType, MEMORY_TYPES } from './config.js';
 
 /**
  * Generate a timestamp-based unique ID.
@@ -57,6 +57,11 @@ export function parseNote(raw: string): Note | null {
             case 'source':
                 meta.source = value;
                 break;
+            case 'type':
+                if (MEMORY_TYPES.includes(value as MemoryType)) {
+                    meta.type = value as MemoryType;
+                }
+                break;
             case 'tags':
                 meta.tags = value
                     .replace(/^\[/, '')
@@ -77,6 +82,7 @@ export function parseNote(raw: string): Note | null {
             updated: meta.updated || now(),
             tags: meta.tags || [],
             source: meta.source || 'unknown',
+            ...(meta.type ? { type: meta.type } : {}),
         },
         content,
     };
@@ -93,17 +99,23 @@ export function serializeNote(note: Note): string {
         `updated: ${note.meta.updated}`,
         `tags: [${note.meta.tags.join(', ')}]`,
         `source: ${note.meta.source}`,
-        '---',
-        '',
-        note.content,
     ];
+    if (note.meta.type) {
+        lines.push(`type: ${note.meta.type}`);
+    }
+    lines.push('---', '', note.content);
     return lines.join('\n') + '\n';
 }
 
 /**
  * Save a new note to disk and return it
  */
-export async function saveNote(content: string, tags: string[] = [], source: string = 'unknown'): Promise<Note> {
+export async function saveNote(
+    content: string,
+    tags: string[] = [],
+    source: string = 'unknown',
+    type?: MemoryType,
+): Promise<Note> {
     const { notesDir } = await resolveStorageContext();
     await ensureDir(notesDir);
 
@@ -117,6 +129,7 @@ export async function saveNote(content: string, tags: string[] = [], source: str
             updated: timestamp,
             tags,
             source,
+            ...(type ? { type } : {}),
         },
         content,
     };

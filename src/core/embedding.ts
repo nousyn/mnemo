@@ -94,6 +94,7 @@ export async function indexNote(note: Note): Promise<void> {
             tags: note.meta.tags.join(','),
             source: note.meta.source,
             created: note.meta.created,
+            type: note.meta.type || '',
         },
     });
 }
@@ -125,6 +126,7 @@ export interface SearchResult {
     tags: string;
     source: string;
     created: string;
+    type: string;
 }
 
 /**
@@ -198,6 +200,7 @@ function mergeResults(
                 tags: kr.note.meta.tags.join(','),
                 source: kr.note.meta.source,
                 created: kr.note.meta.created,
+                type: kr.note.meta.type || '',
             });
         }
     }
@@ -227,6 +230,7 @@ export async function searchNotes(query: string, topK: number = 5, sourceFilter?
             tags: r.item.metadata.tags as string,
             source: r.item.metadata.source as string,
             created: r.item.metadata.created as string,
+            type: (r.item.metadata.type as string) || '',
         }));
     }
 
@@ -248,6 +252,7 @@ export async function searchNotes(query: string, topK: number = 5, sourceFilter?
             tags: kr.note.meta.tags.join(','),
             source: kr.note.meta.source,
             created: kr.note.meta.created,
+            type: kr.note.meta.type || '',
         }));
     }
 
