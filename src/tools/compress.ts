@@ -12,7 +12,7 @@ export function registerCompressTool(server: McpServer): void {
         {
             title: 'Compress Memory',
             description:
-                'Consolidate and compress existing memory notes. This tool reads all current memories, asks you to distill them into fewer, more concise notes, and replaces the originals. Use this when memory storage grows large, or to periodically organize and clean up memories. The tool returns all current memories for you to review and distill - respond with the compressed version using memory_save.',
+                'Consolidate and compress existing long-term memories. This tool reads current notes, asks you to distill them into fewer and clearer memories, and helps keep the knowledge base focused on durable high-value context instead of fragmented history.',
             inputSchema: {
                 strategy: z
                     .enum(['review', 'auto_tag'])

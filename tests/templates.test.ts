@@ -15,8 +15,8 @@ describe('getPromptBlock', () => {
         expect(block).toContain('memory_search');
         expect(block).toContain('memory_get');
         expect(block).toContain('memory_compress');
-        expect(block).toContain('context window is nearly full');
         expect(block).toContain('context compaction or context window reset');
+        expect(block).toContain('high-value long-term context');
     });
 
     it('应该包含初始化兜底与默认 global 策略', () => {
@@ -24,6 +24,14 @@ describe('getPromptBlock', () => {
         expect(block).toContain('Mnemo has not been initialized yet');
         expect(block).toContain('Default to global scope');
         expect(block).toContain('Use project scope only when the user explicitly wants isolated per-project memory');
+    });
+
+    it('应该包含新的触发顺序与保存边界', () => {
+        const block = getPromptBlock();
+        expect(block).toContain('memory_search -> do the work -> memory_save -> memory_compress');
+        expect(block).toContain('Do not save routine task state');
+        expect(block).toContain('stable preference');
+        expect(block).toContain('continuity thread');
     });
 
     it('无 agentType 时应只包含 base prompt', () => {

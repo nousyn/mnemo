@@ -8,11 +8,17 @@ const BASE_MEMORY_PROMPT = `
 
 You have access to a persistent memory system (Mnemo). Use it to retain important information across conversations.
 
+Mnemo is not a full transcript archive. It is a system for preserving high-value long-term context across conversations.
+
 ### When to save memory (memory_save):
-- Key decisions or conclusions reached during discussion
-- User preferences, habits, or requirements discovered
-- Important context that would be useful in future conversations
-- When context window is nearly full, save key information from the current conversation to preserve continuity
+- Save only high-value long-term context, not temporary details or full conversation logs
+- Save when the user expresses a stable preference, working style, boundary, or requirement
+- Save when a decision is clearly made and will affect future work
+- Save when a long-term goal or direction is clarified
+- Save when an important continuity thread is opened that must be resumed later
+- Save when a reusable rule or workflow convention is established
+- Save a validated high-value experience only when it is likely to matter again across future conversations
+- Before saving, prefer asking yourself whether the information will still matter in a future session
 
 ### When to initialize memory (memory_setup):
 - When Mnemo has not been initialized yet and a memory tool reports that setup is required
@@ -22,6 +28,7 @@ You have access to a persistent memory system (Mnemo). Use it to retain importan
 
 ### When to search memory (memory_search):
 - At the START of each conversation, search for relevant context based on the user's first message
+- Search before doing major work on an ongoing topic, project, or long-running discussion
 - When the user references past discussions or decisions
 - When you need background context for a task
 - When the user asks "do you remember..." or similar
@@ -37,10 +44,13 @@ You have access to a persistent memory system (Mnemo). Use it to retain importan
 - When explicitly asked to organize or clean up memories
 - Periodically during long conversations
 - After context compaction or context window reset — when resuming from a compacted context, check if memories need consolidation before continuing work
+- When a continuity thread has turned into a clear decision, rule, or fact and older notes should be consolidated
 - Workflow: call memory_compress to get all notes → distill them into fewer, concise notes → call memory_compress_apply with the distilled notes and old IDs to atomically save new + delete old
 
 ### Guidelines:
+- Prefer this order: memory_search -> do the work -> memory_save -> memory_compress when needed
 - Save memories in concise, distilled form - capture the essence, not raw conversation
+- Do not save routine task state, ordinary command output, or one-off debugging noise
 - Use descriptive tags to categorize memories
 - Always include relevant project/topic context in the memory content
 - Do not save trivial or temporary information

@@ -13,12 +13,12 @@ export function registerSaveTool(server: McpServer): void {
         {
             title: 'Save Memory',
             description:
-                'Save a piece of important information as a persistent memory note. Use this to record key decisions, user preferences, technical choices, task outcomes, or any context that should be remembered across conversations. Content should be distilled and concise, not raw conversation.',
+                'Save a piece of high-value long-term context as a persistent memory note. Use this for stable preferences, important decisions, long-term goals, reusable rules, or continuity that should matter across future conversations. Content should be distilled and concise, not raw conversation.',
             inputSchema: {
                 content: z
                     .string()
                     .describe(
-                        'The memory content to save. Should be concise and distilled - capture the essence of what needs to be remembered.',
+                        'The long-term context to save. It should capture the durable essence of what should still matter in future conversations.',
                     ),
                 tags: z
                     .array(z.string())

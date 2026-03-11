@@ -67,6 +67,17 @@ describe('tools/list', () => {
             'memory_setup',
         ]);
     });
+
+    it('关键工具描述应体现长期上下文定位', async () => {
+        const { tools } = await client.listTools();
+        const saveTool = tools.find((t) => t.name === 'memory_save');
+        const searchTool = tools.find((t) => t.name === 'memory_search');
+        const compressTool = tools.find((t) => t.name === 'memory_compress');
+
+        expect(saveTool?.description).toContain('high-value long-term context');
+        expect(searchTool?.description).toContain('long-term context');
+        expect(compressTool?.description).toContain('durable high-value context');
+    });
 });
 
 describe('memory_save 工具', () => {

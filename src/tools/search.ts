@@ -20,7 +20,7 @@ export function registerSearchTool(server: McpServer): void {
         {
             title: 'Search Memory',
             description:
-                'Search through persistent memories using semantic similarity. Returns summaries of matching memories. Use memory_get to retrieve full content of specific notes by ID.',
+                'Search through persistent high-value long-term context using semantic similarity. Returns summaries of matching memories so you can recover relevant background before continuing work.',
             inputSchema: {
                 query: z
                     .string()
