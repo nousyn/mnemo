@@ -1,9 +1,13 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { type AgentType } from '../core/config.js';
 import { ensureDir } from '../core/config.js';
 import { HOOK_CONFIGS } from './reminders.js';
+
+const execFileAsync = promisify(execFile);
 
 export interface HookInstallResult {
     success: boolean;
@@ -57,9 +61,14 @@ export async function installHooks(agentType: AgentType): Promise<HookInstallRes
             result.settingsUpdated = true;
         }
 
-        // Step 3: Agent-specific post-install notes
+        // Step 3: Agent-specific post-install actions
         if (agentType === 'openclaw') {
-            result.notes.push('Run `openclaw hooks enable mnemo` to activate the hook.');
+            try {
+                await execFileAsync('openclaw', ['hooks', 'enable', 'mnemo']);
+                result.notes.push('Hook activated automatically via `openclaw hooks enable mnemo`.');
+            } catch {
+                result.notes.push('Run `openclaw hooks enable mnemo` to activate the hook.');
+            }
         }
 
         result.success = true;
