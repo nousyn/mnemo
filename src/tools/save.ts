@@ -22,6 +22,7 @@ export function registerSaveTool(server: McpServer): void {
                     ),
                 type: z
                     .enum(MEMORY_TYPES)
+                    .optional()
                     .describe(
                         'Memory type classification. Helps organize and retrieve memories. Options: preference (user preferences/habits), profile (stable background info), goal (long-term directions), continuity (unresolved threads to resume), fact (stable objective info), decision (confirmed choices), rule (reusable conventions), experience (validated reusable lessons).',
                     ),
@@ -39,6 +40,9 @@ export function registerSaveTool(server: McpServer): void {
         },
         async ({ content, type, tags, source }) => {
             try {
+                // Fallback: default to 'fact' if type not provided
+                const resolvedType = type || 'fact';
+
                 // Dedup detection: check for similar existing notes before saving
                 let dedupWarning = '';
                 try {
@@ -57,7 +61,7 @@ export function registerSaveTool(server: McpServer): void {
                 }
 
                 // Save the note to disk
-                const note = await saveNote(content, tags || [], source || 'unknown', type);
+                const note = await saveNote(content, tags || [], source || 'unknown', resolvedType);
 
                 // Try to index for semantic search (may be slow on first call)
                 let indexWarning = '';
@@ -78,12 +82,15 @@ export function registerSaveTool(server: McpServer): void {
                 }
 
                 const typeLine = `\nType: ${note.meta.type}`;
+                const typeHint = !type
+                    ? '\n\nHint: No type was specified — defaulted to "fact". Please always specify a type when saving memories for better organization.'
+                    : '';
 
                 return {
                     content: [
                         {
                             type: 'text' as const,
-                            text: `Memory saved successfully.\n\nID: ${note.meta.id}${typeLine}\nTags: [${note.meta.tags.join(', ')}]${dedupWarning}${indexWarning}${compressHint}`,
+                            text: `Memory saved successfully.\n\nID: ${note.meta.id}${typeLine}\nTags: [${note.meta.tags.join(', ')}]${typeHint}${dedupWarning}${indexWarning}${compressHint}`,
                         },
                     ],
                 };

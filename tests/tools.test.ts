@@ -99,7 +99,7 @@ describe('memory_save 工具', () => {
         expect(text).toContain('preference');
     });
 
-    it('无 tags 和 source 也应成功（type 必填）', async () => {
+    it('无 tags 和 source 也应成功', async () => {
         const result = await client.callTool({
             name: 'memory_save',
             arguments: {
@@ -111,6 +111,20 @@ describe('memory_save 工具', () => {
         const text = getResponseText(result);
         expect(text).toContain('Memory saved successfully');
         expect(text).toContain('Type: fact');
+    });
+
+    it('不传 type 应 fallback 为 fact 并给出提示', async () => {
+        const result = await client.callTool({
+            name: 'memory_save',
+            arguments: {
+                content: '无 type 的保存测试',
+            },
+        });
+
+        const text = getResponseText(result);
+        expect(text).toContain('Memory saved successfully');
+        expect(text).toContain('Type: fact');
+        expect(text).toContain('No type was specified');
     });
 
     it('指定 type 应保存并显示类型', async () => {
