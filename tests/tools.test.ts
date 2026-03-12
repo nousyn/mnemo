@@ -614,7 +614,7 @@ describe('memory_setup 工具', () => {
         });
 
         const text = getResponseText(result);
-        expect(text).toContain('Prompt scope: global');
+        expect(text).toContain('Prompt: installed');
         expect(text).toContain('Storage scope: global');
 
         const written = await fs.readFile(path.join(fakeHome, '.claude', 'CLAUDE.md'), 'utf-8');
@@ -632,7 +632,7 @@ describe('memory_setup 工具', () => {
 
         const text = getResponseText(result);
         expect(text).toMatch(/initialized successfully|updated successfully/);
-        expect(text).toContain('Prompt scope: project');
+        expect(text).toContain('Prompt:');
         expect(text).toContain('Storage scope: project');
 
         // 验证文件写到了临时目录而非项目根目录
@@ -670,7 +670,7 @@ describe('memory_setup 工具', () => {
         });
 
         const text = getResponseText(result);
-        expect(text).toContain(`Prompt file: ${path.join(explicitRoot, 'CLAUDE.md')}`);
+        expect(text).toContain(`Prompt: installed → ${path.join(explicitRoot, 'CLAUDE.md')}`);
         expect(text).toContain(`Storage path: ${path.join(explicitRoot, '.mnemo')}`);
     });
 });

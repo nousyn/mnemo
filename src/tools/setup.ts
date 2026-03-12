@@ -7,6 +7,7 @@ import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { AGENT_TYPES, CLIENT_NAME_MAP, type AgentType, writeStorageConfig } from '../core/config.js';
 import { getAgentConfig, injectPrompt, hasPromptInjected } from '../prompts/templates.js';
+import { installHooks } from '../hooks/installer.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -188,22 +189,8 @@ export function registerSetupTool(server: McpServer): void {
                 // File doesn't exist yet, that's fine
             }
 
-            // Check if already installed
-            if (hasPromptInjected(existingContent)) {
-                // Update in place
-                const updated = injectPrompt(existingContent, agentType);
-                await fs.writeFile(targetPath, updated, 'utf-8');
-                return {
-                    content: [
-                        {
-                            type: 'text' as const,
-                            text: `Mnemo memory instructions updated successfully.\n\nAgent type: ${agentType}\nPrompt scope: ${scope}\nPrompt file: ${targetPath}\nStorage scope: ${scope}\nStorage path: ${storagePath}`,
-                        },
-                    ],
-                };
-            }
-
-            // Inject prompt
+            // --- Step 1: Prompt injection ---
+            const isUpdate = hasPromptInjected(existingContent);
             const updated = injectPrompt(existingContent, agentType);
 
             // Ensure parent directory exists
@@ -212,11 +199,48 @@ export function registerSetupTool(server: McpServer): void {
 
             await fs.writeFile(targetPath, updated, 'utf-8');
 
+            const promptStatus = isUpdate ? 'updated' : 'installed';
+
+            // --- Step 2: Hook installation (independent from prompt) ---
+            const hookResult = await installHooks(agentType);
+
+            // --- Build report ---
+            const lines: string[] = [
+                isUpdate
+                    ? 'Mnemo memory instructions updated successfully.'
+                    : 'Mnemo memory management initialized successfully.',
+                '',
+                `Agent type: ${agentType}`,
+                `Prompt: ${promptStatus} → ${targetPath}`,
+                `Storage scope: ${scope}`,
+                `Storage path: ${storagePath}`,
+            ];
+
+            if (hookResult.success) {
+                lines.push('');
+                lines.push(`Hooks: installed → ${hookResult.hookDir}`);
+                if (hookResult.settingsUpdated) {
+                    lines.push('Hook settings: merged into agent settings.json');
+                }
+                for (const note of hookResult.notes) {
+                    lines.push(`Note: ${note}`);
+                }
+            } else {
+                lines.push('');
+                lines.push(`Hooks: failed — ${hookResult.error}`);
+                lines.push('Prompt injection succeeded independently. Hooks can be retried later.');
+            }
+
+            if (!isUpdate) {
+                lines.push('');
+                lines.push('Mnemo is now ready to use.');
+            }
+
             return {
                 content: [
                     {
                         type: 'text' as const,
-                        text: `Mnemo memory management initialized successfully.\n\nAgent type: ${agentType}\nPrompt scope: ${scope}\nPrompt file: ${targetPath}\nStorage scope: ${scope}\nStorage path: ${storagePath}\n\nMnemo is now ready to use.`,
+                        text: lines.join('\n'),
                     },
                 ],
             };
