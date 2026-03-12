@@ -1,14 +1,16 @@
 # Mnemo
 
-通过 [MCP](https://modelcontextprotocol.io/) 为 AI 编程助手提供持久化记忆管理。
+通过 [MCP](https://modelcontextprotocol.io/) 为 AI 编程助手提供持久化的高价值长期上下文。
 
-Mnemo 解决的是 context window 溢出导致记忆丢失的问题——重要的决策、用户偏好和项目知识会在对话重置时消失。Mnemo 将关键信息蒸馏为持久化的记忆笔记，可通过语义搜索在不同会话间检索。
+Mnemo 不是对话记录归档。它只捕获那些在未来会话中仍然重要的上下文——决策、偏好、规则、未完成的线索——并通过语义搜索提供检索。可以把它理解为 AI Agent 的持久化长期记忆。
 
 ## 特性
 
+- **记忆类型** — 8 种语义分类（preference、profile、goal、continuity、fact、decision、rule、experience），保存时必须指定类型
+- **生命周期 Hook** — 通过 Agent 原生 hook 机制注入每轮提醒（Claude Code、Codex、OpenClaw、OpenCode），让 Agent 真正记得使用记忆工具
 - **混合搜索** — 同时通过语义和关键词查找记忆（向量 + 关键词，自动降级）
 - **渐进式展示** — 搜索返回摘要；按需获取完整内容
-- **多 Agent 支持** — 适配 OpenCode、Claude Code、Openclaw 和 Codex
+- **多 Agent 支持** — 适配 OpenCode、Claude Code、OpenClaw 和 Codex；通过 MCP 协议自动检测 Agent 类型
 - **完全本地化** — 无 API 调用，无云存储，所有数据留在你的机器上
 - **自动提示注入** — 向 Agent 配置文件注入使用指令，让 Agent 知道何时保存和检索记忆
 - **压缩工作流** — 原子性地将旧笔记蒸馏为更少、更精炼的笔记
@@ -99,13 +101,18 @@ mcporter config add mnemo --command mnemo --scope home
 
 ### 初始化
 
-连接后，调用 `memory_setup` 工具将记忆管理指令注入 Agent 配置文件，并初始化存储：
+连接后，调用 `memory_setup` 工具初始化 Mnemo：
 
 ```
 > 使用 memory_setup 工具初始化 Mnemo
 ```
 
-这会在 Agent 配置文件中写入一段提示（如 OpenCode 的 `AGENTS.md`、Claude Code 的 `CLAUDE.md`），告诉 Agent 何时以及如何使用 Mnemo 的工具。
+这会执行两个步骤：
+
+1. **提示注入** — 将记忆管理指令写入 Agent 配置文件（如 OpenCode 的 `AGENTS.md`、Claude Code 的 `CLAUDE.md`）
+2. **Hook 安装** — 安装生命周期 hook，在关键时刻提醒 Agent 使用记忆工具（Claude Code/Codex 每轮提醒，OpenClaw 会话启动时提醒，OpenCode 会话生命周期事件提醒）
+
+两个步骤相互独立——其中一个失败不影响另一个。Agent 类型通过 MCP 协议自动检测，文件检测作为降级方案。
 
 默认情况下，`memory_setup()` 会初始化为**全局记忆**，在多个项目之间共享。如果你需要项目隔离的记忆，请在调用 `memory_setup` 时传入 `scope: "project"`。
 
@@ -183,12 +190,29 @@ Mnemo 提供 7 个 MCP 工具：
 | 工具                    | 说明                                         |
 | ----------------------- | -------------------------------------------- |
 | `memory_setup`          | 初始化 Mnemo — 注入使用指令并建立存储作用域  |
-| `memory_save`           | 保存记忆笔记，可附带标签和来源               |
+| `memory_save`           | 保存记忆笔记，需指定类型，可附带标签和来源   |
 | `memory_search`         | 混合搜索记忆，返回摘要（支持来源和标签过滤） |
 | `memory_get`            | 按 ID 获取笔记完整内容                       |
 | `memory_compress`       | 列出所有笔记供审阅/蒸馏                      |
 | `memory_compress_apply` | 原子性地保存蒸馏笔记并删除原始笔记           |
 | `memory_delete`         | 按 ID 删除笔记                               |
+
+## 记忆模型
+
+每条记忆笔记在保存前必须归入 8 种类型之一：
+
+| 类型         | 用途                           | 示例                                       |
+| ------------ | ------------------------------ | ------------------------------------------ |
+| `preference` | 用户偏好和协作习惯             | "偏好 4 空格缩进，单引号"                  |
+| `profile`    | 用户/项目/主题的稳定背景       | "项目使用 Next.js 14 App Router"           |
+| `goal`       | 长期方向和目标                 | "Q3 前从 REST 迁移到 GraphQL"              |
+| `continuity` | 需要后续恢复的未完成线索       | "认证模块：停在 refresh token 逻辑"        |
+| `fact`       | 稳定的客观信息                 | "生产数据库是 PostgreSQL 16"               |
+| `decision`   | 讨论中确认的选择               | "选了 Prisma 而非 Drizzle，看中类型安全"   |
+| `rule`       | 可复用的约定和协议             | "所有 API 错误返回 { code, message } 格式" |
+| `experience` | 经过验证的可复用经验（高门槛） | "批量写入 DB 让迁移时间缩短了 10 倍"       |
+
+记忆保存需满足 3 条标准中的至少 2 条：(1) 跨会话有用，(2) 影响未来工作，(3) 遗忘后需要重新对齐。
 
 ## 工作原理
 

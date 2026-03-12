@@ -2,15 +2,17 @@
 
 [中文文档](./docs/README.zh-CN.md)
 
-Persistent memory management for AI coding assistants via [MCP](https://modelcontextprotocol.io/).
+Persistent, high-value long-term context for AI coding assistants via [MCP](https://modelcontextprotocol.io/).
 
-Mnemo solves the problem of context window overflow — important decisions, user preferences, and project knowledge get lost when conversations reset. Mnemo distills key information into persistent memory notes that can be recalled across sessions using semantic search.
+Mnemo is not a transcript archive. It captures only the context that will still matter across future sessions — decisions, preferences, rules, and unresolved threads — and makes it available through semantic search. Think of it as durable long-term memory for your AI agent.
 
 ## Features
 
+- **Memory types** — 8 semantic categories (preference, profile, goal, continuity, fact, decision, rule, experience) with save-time classification
+- **Lifecycle hooks** — per-turn reminders injected via agent-native hooks (Claude Code, Codex, OpenClaw, OpenCode) so the agent actually remembers to use memory tools
 - **Hybrid search** — find memories by meaning and keywords (vector + keyword, with automatic fallback)
 - **Progressive disclosure** — search returns summaries; retrieve full content on demand
-- **Multi-agent support** — works with OpenCode, Claude Code, Openclaw, and Codex
+- **Multi-agent support** — works with OpenCode, Claude Code, OpenClaw, and Codex; auto-detects agent type via MCP protocol
 - **Fully local** — no API calls, no cloud storage; all data stays on your machine
 - **Auto-prompted** — injects instructions into your agent's config so it knows when to save and recall memories
 - **Compression workflow** — atomic distillation of old notes into fewer, concise ones
@@ -101,13 +103,18 @@ mcporter config add mnemo --command mnemo --scope home
 
 ### Initialize
 
-Once connected, call the `memory_setup` tool to inject memory management instructions into your agent's config file and initialize storage:
+Once connected, call the `memory_setup` tool to initialize Mnemo:
 
 ```
 > Use the memory_setup tool to initialize Mnemo
 ```
 
-This writes a prompt block into your agent's config (e.g., `AGENTS.md` for OpenCode, `CLAUDE.md` for Claude Code) that teaches the agent when and how to use Mnemo's tools.
+This does two things:
+
+1. **Prompt injection** — writes memory management instructions into your agent's config file (e.g., `AGENTS.md` for OpenCode, `CLAUDE.md` for Claude Code)
+2. **Hook installation** — installs lifecycle hooks that remind the agent to use memory tools at key moments (per-turn for Claude Code/Codex, session-start for OpenClaw, session lifecycle events for OpenCode)
+
+Both steps are independent — if one fails, the other still succeeds. Agent type is auto-detected via MCP protocol, with file-based detection as fallback.
 
 By default, `memory_setup()` initializes **global** memory shared across projects. If you want project-isolated memory, call `memory_setup` with `scope: "project"`.
 
@@ -187,12 +194,29 @@ Mnemo provides 7 MCP tools:
 | Tool                    | Description                                                         |
 | ----------------------- | ------------------------------------------------------------------- |
 | `memory_setup`          | Initialize Mnemo — inject usage instructions and set up storage     |
-| `memory_save`           | Save a memory note with optional tags and source                    |
+| `memory_save`           | Save a memory note with type, optional tags, and source             |
 | `memory_search`         | Hybrid search across memories; returns summaries (supports filters) |
 | `memory_get`            | Retrieve full content of specific notes by ID                       |
 | `memory_compress`       | List all notes for review/distillation                              |
 | `memory_compress_apply` | Atomically save distilled notes and delete originals                |
 | `memory_delete`         | Delete notes by ID                                                  |
+
+## Memory Model
+
+Every memory note is classified into one of 8 types before saving:
+
+| Type         | Purpose                                         | Example                                         |
+| ------------ | ----------------------------------------------- | ----------------------------------------------- |
+| `preference` | User preferences and collaboration habits       | "Prefers 4-space indentation, single quotes"    |
+| `profile`    | Stable background about user, project, or topic | "Project uses Next.js 14 with App Router"       |
+| `goal`       | Long-term directions and objectives             | "Migrate from REST to GraphQL by Q3"            |
+| `continuity` | Unresolved threads to resume later              | "Auth module: left off at refresh token logic"  |
+| `fact`       | Stable objective information                    | "Production DB is on PostgreSQL 16"             |
+| `decision`   | Confirmed choices from a discussion             | "Chose Prisma over Drizzle for type safety"     |
+| `rule`       | Reusable conventions and agreements             | "All API errors return { code, message } shape" |
+| `experience` | Validated, reusable lessons (high bar)          | "Batch DB writes cut migration time by 10x"     |
+
+A memory must meet at least 2 of 3 criteria to be worth saving: (1) useful across future sessions, (2) affects future work, (3) would require re-alignment if forgotten.
 
 ## How It Works
 
