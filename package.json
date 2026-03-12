@@ -1,6 +1,6 @@
 {
   "name": "@s_s/mnemo",
-  "version": "1.4.1",
+  "version": "1.4.2",
   "description": "Memory management MCP server for AI coding assistants",
   "type": "module",
   "main": "./build/index.js",
