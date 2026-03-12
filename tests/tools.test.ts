@@ -124,8 +124,8 @@ describe('memory_save 工具', () => {
         const text = getResponseText(result);
         expect(text).toContain('Memory saved successfully');
         expect(text).toContain('Type: fact');
-        expect(text).toContain('No type was specified');
-        expect(text).toContain('MUST always determine the correct type');
+        expect(text).toContain('No type specified');
+        expect(text).toContain('force-defaulted to "fact"');
     });
 
     it('指定 type 应保存并显示类型', async () => {

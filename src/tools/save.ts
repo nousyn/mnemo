@@ -83,7 +83,7 @@ export function registerSaveTool(server: McpServer): void {
 
                 const typeLine = `\nType: ${note.meta.type}`;
                 const typeHint = !type
-                    ? '\n\nIMPORTANT: No type was specified — this memory was force-defaulted to "fact", which is likely WRONG. You MUST always determine the correct type (preference/profile/goal/continuity/fact/decision/rule/experience) BEFORE saving. Untyped memories degrade retrieval quality and make the entire memory system less useful.'
+                    ? '\n\nWARNING: No type specified — force-defaulted to "fact". Always specify the correct type before saving. Untyped memories degrade retrieval quality.'
                     : '';
 
                 return {
