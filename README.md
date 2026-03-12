@@ -2,7 +2,7 @@
 
 [中文文档](./docs/README.zh-CN.md)
 
-> _Mnemosyne, mother of all creation, stood against the river of forgetting. Mnemo keeps only what still matters._
+> _Mnemosyne, mother of all creation, stood against Lethe, the river of forgetting. Mnemo keeps only what still matters._
 
 Persistent, high-value long-term context for AI coding assistants via [MCP](https://modelcontextprotocol.io/).
 
