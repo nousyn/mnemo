@@ -2,6 +2,8 @@
 
 [中文文档](./docs/README.zh-CN.md)
 
+> _Mnemosyne, mother of all creation, stood against the river of forgetting. Mnemo keeps only what still matters._
+
 Persistent, high-value long-term context for AI coding assistants via [MCP](https://modelcontextprotocol.io/).
 
 Mnemo is not a transcript archive. It captures only the context that will still matter across future sessions — decisions, preferences, rules, and unresolved threads — and makes it available through semantic search. Think of it as durable long-term memory for your AI agent.
