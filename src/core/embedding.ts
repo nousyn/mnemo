@@ -206,25 +206,46 @@ function keywordSearch(
 }
 
 /**
- * Merge vector search and keyword search results.
+ * Time decay half-life in days.
+ * After this many days, a memory's recency score drops to ~0.5.
+ * 7 days: last week ≈ 0.5, two weeks ≈ 0.25, one month ≈ 0.06
+ */
+export const TIME_DECAY_HALF_LIFE_DAYS = 7;
+
+/**
+ * Calculate time-based recency score using exponential decay.
+ * Returns a value in [0, 1] where 1 = just now, approaching 0 = very old.
+ */
+export function recencyScore(created: string, halfLifeDays: number = TIME_DECAY_HALF_LIFE_DAYS): number {
+    const ageMs = Date.now() - new Date(created).getTime();
+    const ageDays = Math.max(0, ageMs / (1000 * 60 * 60 * 24));
+    return Math.pow(2, -ageDays / halfLifeDays);
+}
+
+/**
+ * Merge vector search and keyword search results with time decay.
  * Deduplicates by ID, takes weighted combination for items found by both.
+ * Final score = semantic * 0.6 + keyword * 0.2 + recency * 0.2
  */
 function mergeResults(
     vectorResults: SearchResult[],
     keywordResults: Array<{ id: string; score: number; note: Note }>,
-    vectorWeight: number = 0.7,
-    textWeight: number = 0.3,
+    vectorWeight: number = 0.6,
+    textWeight: number = 0.2,
+    recencyWeight: number = 0.2,
 ): SearchResult[] {
     const merged = new Map<string, SearchResult>();
 
     // Add vector results
     for (const r of vectorResults) {
-        merged.set(r.id, { ...r, score: r.score * vectorWeight });
+        const recency = recencyScore(r.created);
+        merged.set(r.id, { ...r, score: r.score * vectorWeight + recency * recencyWeight });
     }
 
     // Merge keyword results
     for (const kr of keywordResults) {
         const existing = merged.get(kr.id);
+        const recency = recencyScore(kr.note.meta.created);
         if (existing) {
             // Found in both — combine scores
             existing.score += kr.score * textWeight;
@@ -232,7 +253,7 @@ function mergeResults(
             // Only found by keyword search
             merged.set(kr.id, {
                 id: kr.id,
-                score: kr.score * textWeight,
+                score: kr.score * textWeight + recency * recencyWeight,
                 text: kr.note.content.slice(0, 500),
                 tags: kr.note.meta.tags.join(','),
                 source: kr.note.meta.source,
@@ -281,16 +302,18 @@ export async function searchNotes(query: string, topK: number = 5, sourceFilter?
     }
 
     if (vectorResults.length === 0) {
-        // Keyword-only fallback
-        return keywordResults.slice(0, topK).map((kr) => ({
+        // Keyword-only fallback (with recency boost)
+        const results = keywordResults.map((kr) => ({
             id: kr.id,
-            score: kr.score,
+            score: kr.score * 0.8 + recencyScore(kr.note.meta.created) * 0.2,
             text: kr.note.content.slice(0, 500),
             tags: kr.note.meta.tags.join(','),
             source: kr.note.meta.source,
             created: kr.note.meta.created,
             type: kr.note.meta.type || '',
         }));
+        results.sort((a, b) => b.score - a.score);
+        return results.slice(0, topK);
     }
 
     const merged = mergeResults(vectorResults, keywordResults);

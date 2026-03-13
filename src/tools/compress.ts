@@ -99,12 +99,38 @@ export function registerCompressTool(server: McpServer): void {
                     .join('\n\n---\n\n');
 
                 const noteIds = targetNotes.map((n) => n.meta.id);
+                const oldIdsJson = JSON.stringify(noteIds);
 
                 return {
                     content: [
                         {
                             type: 'text' as const,
-                            text: `Found ${targetNotes.length} memories to compress (${Math.round(stats.totalSize / 1000)}KB total).\n\nPlease review the following memories and distill them into fewer, more concise notes. After reviewing, use memory_compress_apply to submit the compressed versions — it will atomically save the new notes and delete the originals.\n\nOriginal note IDs to delete after compression: [${noteIds.join(', ')}]\n\n---\n\n${notesText}`,
+                            text: `Found ${targetNotes.length} memories to compress (${Math.round(stats.totalSize / 1000)}KB total).
+
+## Instructions
+
+1. Review all memories below
+2. Distill them into fewer, concise notes (group related content, remove duplicates)
+3. Call memory_compress_apply with the exact parameter format shown below
+
+## memory_compress_apply parameter format
+
+\`\`\`json
+{
+  "notes": [
+    {"content": "The distilled note text", "tags": ["tag1", "tag2"], "type": "fact"},
+    {"content": "Another distilled note", "tags": ["tag3"], "type": "decision"}
+  ],
+  "old_ids": ${oldIdsJson}
+}
+\`\`\`
+
+- **notes**: Array of distilled notes. Each note has: content (string, required), tags (string array, optional), type (one of: preference, profile, goal, continuity, fact, decision, rule, experience)
+- **old_ids**: Copy the array above exactly as-is — these are the IDs to delete after saving the new notes
+
+---
+
+${notesText}`,
                         },
                     ],
                 };

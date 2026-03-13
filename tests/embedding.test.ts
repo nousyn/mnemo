@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, type TaskContext } from 'vitest';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
@@ -12,21 +12,33 @@ import {
     preloadEmbedding,
     findSimilar,
     DEDUP_SIMILARITY_THRESHOLD,
+    recencyScore,
+    TIME_DECAY_HALF_LIFE_DAYS,
 } from '../src/core/embedding.js';
 import { writeStorageConfig } from '../src/core/config.js';
 import { saveNote, deleteNote } from '../src/core/notes.js';
 
 let tmpDir: string;
+let embeddingAvailable = false;
+
+/** 在 embedding 模型不可用时跳过测试 */
+function requireEmbedding(ctx: TaskContext) {
+    if (!embeddingAvailable) ctx.skip();
+}
 
 beforeAll(async () => {
     tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'mnemo-emb-test-'));
     process.env.MNEMO_DATA_DIR = tmpDir;
     await writeStorageConfig('global');
 
-    // 预加载模型，等待就绪
-    preloadEmbedding();
-    // 通过执行一次 embed 来确保模型加载完毕
-    await embed('warmup');
+    // 尝试预加载模型，网络不可用时标记为不可用而非让整个套件失败
+    try {
+        preloadEmbedding();
+        await embed('warmup');
+        embeddingAvailable = true;
+    } catch {
+        console.warn('Embedding model unavailable, skipping embedding-dependent tests');
+    }
 }, 60_000);
 
 afterAll(async () => {
@@ -35,13 +47,15 @@ afterAll(async () => {
 });
 
 describe('embed', () => {
-    it('应该返回 384 维向量', async () => {
+    it('应该返回 384 维向量', async (ctx) => {
+        requireEmbedding(ctx);
         const vector = await embed('测试文本');
         expect(vector).toHaveLength(384);
         expect(typeof vector[0]).toBe('number');
     });
 
-    it('相似文本的向量应该更接近', async () => {
+    it('相似文本的向量应该更接近', async (ctx) => {
+        requireEmbedding(ctx);
         const v1 = await embed('TypeScript 严格模式配置');
         const v2 = await embed('TypeScript strict mode settings');
         const v3 = await embed('今天天气怎么样');
@@ -55,13 +69,15 @@ describe('embed', () => {
 });
 
 describe('isEmbeddingReady', () => {
-    it('模型加载后应返回 true', () => {
+    it('模型加载后应返回 true', (ctx) => {
+        requireEmbedding(ctx);
         expect(isEmbeddingReady()).toBe(true);
     });
 });
 
 describe('indexNote / searchNotes / removeFromIndex', () => {
-    it('应该能索引笔记并通过语义搜索找到', async () => {
+    it('应该能索引笔记并通过语义搜索找到', async (ctx) => {
+        requireEmbedding(ctx);
         const note = await saveNote('用户偏好使用 Prettier 格式化代码', ['preference'], 'opencode');
         await indexNote(note);
 
@@ -73,7 +89,8 @@ describe('indexNote / searchNotes / removeFromIndex', () => {
         await removeFromIndex(note.meta.id);
     });
 
-    it('搜索结果应包含正确的元数据', async () => {
+    it('搜索结果应包含正确的元数据', async (ctx) => {
+        requireEmbedding(ctx);
         const note = await saveNote('架构决策：使用 vectra 做向量检索', ['architecture'], 'opencode');
         await indexNote(note);
 
@@ -86,7 +103,8 @@ describe('indexNote / searchNotes / removeFromIndex', () => {
         await removeFromIndex(note.meta.id);
     });
 
-    it('搜索结果应包含 type 字段', async () => {
+    it('搜索结果应包含 type 字段', async (ctx) => {
+        requireEmbedding(ctx);
         const note = await saveNote('type 索引测试', ['emb-type'], 'opencode', 'decision');
         await indexNote(note);
 
@@ -98,7 +116,8 @@ describe('indexNote / searchNotes / removeFromIndex', () => {
         await removeFromIndex(note.meta.id);
     });
 
-    it('无 type 的笔记搜索结果 type 应为空字符串', async () => {
+    it('无 type 的笔记搜索结果 type 应为空字符串', async (ctx) => {
+        requireEmbedding(ctx);
         const note = await saveNote('无 type 索引测试 embNoType', ['emb-type'], 'opencode');
         await indexNote(note);
 
@@ -110,7 +129,8 @@ describe('indexNote / searchNotes / removeFromIndex', () => {
         await removeFromIndex(note.meta.id);
     });
 
-    it('source_filter 应该过滤结果', async () => {
+    it('source_filter 应该过滤结果', async (ctx) => {
+        requireEmbedding(ctx);
         const n1 = await saveNote('来自 opencode 的笔记', ['test'], 'opencode');
         const n2 = await saveNote('来自 claude 的笔记', ['test'], 'claude-code');
         await indexNote(n1);
@@ -124,7 +144,8 @@ describe('indexNote / searchNotes / removeFromIndex', () => {
         await removeMultipleFromIndex([n1.meta.id, n2.meta.id]);
     });
 
-    it('removeFromIndex + 删除文件后搜索不应返回该笔记', async () => {
+    it('removeFromIndex + 删除文件后搜索不应返回该笔记', async (ctx) => {
+        requireEmbedding(ctx);
         const note = await saveNote('即将删除的笔记 uniqueDelTest', ['temp'], 'opencode');
         await indexNote(note);
 
@@ -136,7 +157,8 @@ describe('indexNote / searchNotes / removeFromIndex', () => {
         expect(ids).not.toContain(note.meta.id);
     });
 
-    it('removeMultipleFromIndex + 删除文件后应批量清除', async () => {
+    it('removeMultipleFromIndex + 删除文件后应批量清除', async (ctx) => {
+        requireEmbedding(ctx);
         const n1 = await saveNote('批量删除测试1 batchDelAlpha', ['temp'], 'opencode');
         const n2 = await saveNote('批量删除测试2 batchDelBeta', ['temp'], 'opencode');
         await indexNote(n1);
@@ -154,7 +176,8 @@ describe('indexNote / searchNotes / removeFromIndex', () => {
 });
 
 describe('hybrid search (vector + keyword)', () => {
-    it('关键词搜索应能找到精确匹配的笔记', async () => {
+    it('关键词搜索应能找到精确匹配的笔记', async (ctx) => {
+        requireEmbedding(ctx);
         const note = await saveNote('项目使用 unicornXYZ 作为唯一标识符方案', ['test'], 'opencode');
         // 不索引到 vectra，仅靠关键词搜索
         const results = await searchNotes('unicornXYZ', 5);
@@ -162,7 +185,8 @@ describe('hybrid search (vector + keyword)', () => {
         expect(results.some((r) => r.id === note.meta.id)).toBe(true);
     });
 
-    it('混合搜索应合并两种来源的结果', async () => {
+    it('混合搜索应合并两种来源的结果', async (ctx) => {
+        requireEmbedding(ctx);
         const note = await saveNote('混合搜索测试笔记 hybridTestAlpha 格式化工具', ['hybrid'], 'opencode');
         await indexNote(note);
 
@@ -176,7 +200,8 @@ describe('hybrid search (vector + keyword)', () => {
 });
 
 describe('findSimilar', () => {
-    it('应该找到语义相似的已索引笔记', async () => {
+    it('应该找到语义相似的已索引笔记', async (ctx) => {
+        requireEmbedding(ctx);
         const note = await saveNote('用户偏好 Prettier 格式化代码，singleQuote tabWidth 4', ['pref'], 'opencode');
         await indexNote(note);
 
@@ -188,7 +213,8 @@ describe('findSimilar', () => {
         await removeFromIndex(note.meta.id);
     });
 
-    it('完全不相关的内容不应触发相似匹配', async () => {
+    it('完全不相关的内容不应触发相似匹配', async (ctx) => {
+        requireEmbedding(ctx);
         const note = await saveNote('量子计算在蛋白质折叠中的应用前景 quantumProteinUnique', ['sci'], 'opencode');
         await indexNote(note);
 
@@ -203,10 +229,64 @@ describe('findSimilar', () => {
         expect(DEDUP_SIMILARITY_THRESHOLD).toBe(0.85);
     });
 
-    it('空索引时应返回空数组', async () => {
+    it('空索引时应返回空数组', async (ctx) => {
+        requireEmbedding(ctx);
         // findSimilar 在 embedding ready 但索引可能有内容时仍能工作
         // 这里测试的是：即使有笔记，自定义高阈值也不应匹配
         const similar = await findSimilar('完全随机的内容 xkcd42 zzzqqq', 0.99);
         expect(similar).toEqual([]);
+    });
+});
+
+describe('recencyScore', () => {
+    it('TIME_DECAY_HALF_LIFE_DAYS 应该是 7', () => {
+        expect(TIME_DECAY_HALF_LIFE_DAYS).toBe(7);
+    });
+
+    it('刚创建的笔记得分应接近 1', () => {
+        const now = new Date().toISOString();
+        const score = recencyScore(now);
+        expect(score).toBeGreaterThan(0.99);
+        expect(score).toBeLessThanOrEqual(1);
+    });
+
+    it('7 天前的笔记得分应接近 0.5（半衰期）', () => {
+        const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+        const score = recencyScore(sevenDaysAgo);
+        expect(score).toBeCloseTo(0.5, 1);
+    });
+
+    it('14 天前的笔记得分应接近 0.25（两个半衰期）', () => {
+        const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
+        const score = recencyScore(fourteenDaysAgo);
+        expect(score).toBeCloseTo(0.25, 1);
+    });
+
+    it('很久以前的笔记得分应接近 0', () => {
+        const longAgo = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString();
+        const score = recencyScore(longAgo);
+        expect(score).toBeLessThan(0.001);
+    });
+
+    it('自定义半衰期应生效', () => {
+        const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
+        const score = recencyScore(threeDaysAgo, 3);
+        expect(score).toBeCloseTo(0.5, 1);
+    });
+
+    it('未来时间戳得分应为 1（ageDays clamped to 0）', () => {
+        const future = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+        const score = recencyScore(future);
+        expect(score).toBe(1);
+    });
+
+    it('得分应随时间单调递减', () => {
+        const now = Date.now();
+        const scores = [0, 1, 3, 7, 14, 30, 60].map((days) =>
+            recencyScore(new Date(now - days * 24 * 60 * 60 * 1000).toISOString()),
+        );
+        for (let i = 1; i < scores.length; i++) {
+            expect(scores[i]).toBeLessThan(scores[i - 1]);
+        }
     });
 });

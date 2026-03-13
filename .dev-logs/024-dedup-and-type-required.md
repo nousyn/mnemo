@@ -1,4 +1,4 @@
-# 024 - Dedup 检测 + type 参数必填
+# 024 - Dedup 检测 + type 参数设计
 
 ## 改动概要
 
@@ -35,18 +35,24 @@ export async function findSimilar(
 - **阈值 0.85** — MiniLM-L6-v2 余弦相似度，0.85+ 基本是语义近似或重复
 - **dedup 检查失败不影响保存** — best effort，try/catch 包裹
 
-### 2. type 参数改为必填
+### 2. type 参数最终设计：optional + fallback + 强警告
 
-**变更：**
+**最终方案（经过三次迭代）：**
 
-- `save.ts` 中 `type` 的 zod schema 从 `.optional()` 改为必填
-- 移除了 `typeHint`（未指定 type 时的 soft hint）— 不再需要
-- `typeLine` 从 `note.meta.type ? ... : ''` 简化为总是显示
+初始实现将 type 改为 required，但发现 MCP SDK 的 zod 验证会在 handler 之前拒绝缺少 required 参数的请求——mnemo 完全没有机会给出友好的 fallback 或提示。这会降低保存成功率，agent 可能因此放弃调用。
 
-**与 prompt 模板一致：**
+最终设计：
 
-- `templates.ts` 已经有 "**Always specify a type when saving.**"
-- 现在 schema 层面也强制执行
+- **schema 层**：`z.enum(MEMORY_TYPES).optional()` — 不拒绝缺少 type 的调用
+- **handler 层**：`const resolvedType = type || 'fact'` — 没传就默认 fact
+- **警告**：未传 type 时返回强提示 "WARNING: No type specified — force-defaulted to 'fact'. Always specify the correct type before saving. Untyped memories degrade retrieval quality."
+- **prompt 层**：templates.ts 有 "**Always specify a type when saving.**" 引导 agent 主动传 type
+
+**三次 commit 记录：**
+
+1. `2ad2f43` — type 改为 required（初始方案）
+2. `45a724b` — type 改回 optional + fallback 为 fact + 提示
+3. `0c2381e` + `0fee5b0` — 强化警告文案，最终精简为一句话
 
 ## 测试变更
 
@@ -69,6 +75,6 @@ export async function findSimilar(
 ## 文件变更
 
 - `src/core/embedding.ts` — 新增 `findSimilar`、`DEDUP_SIMILARITY_THRESHOLD`、`SimilarNote` 类型
-- `src/tools/save.ts` — 加入 dedup 检查、type 改为必填、移除 typeHint
+- `src/tools/save.ts` — 加入 dedup 检查、type optional + fallback + 强警告
 - `tests/embedding.test.ts` — 新增 findSimilar 测试
-- `tests/tools.test.ts` — dedup 测试 + type 修复
+- `tests/tools.test.ts` — dedup 测试 + type 相关测试更新（新增 no-type fallback 测试）
