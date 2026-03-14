@@ -9,7 +9,6 @@ const BASE_MEMORY_PROMPT = `
 You have a persistent memory system (Mnemo). It preserves high-value long-term context across conversations — not transcripts.
 
 ### Core Rules
-- **Search first**: At the START of each conversation, call memory_search based on the user's message before doing work.
 - **Save selectively**: A memory must meet \u22652 of: (1) useful across sessions, (2) affects future work, (3) would need re-alignment if forgotten.
 - **Always specify type** when saving: preference, profile, goal, continuity, fact, decision, rule, or experience.
 - **Dedup before saving**: Check if similar memory exists. Prefer updating/replacing over creating duplicates.

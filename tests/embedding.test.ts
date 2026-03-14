@@ -14,6 +14,7 @@ import {
     DEDUP_SIMILARITY_THRESHOLD,
     recencyScore,
     TIME_DECAY_HALF_LIFE_DAYS,
+    rebuildIndex,
 } from '../src/core/embedding.js';
 import { writeStorageConfig } from '../src/core/config.js';
 import { saveNote, deleteNote } from '../src/core/notes.js';
@@ -288,5 +289,55 @@ describe('recencyScore', () => {
         for (let i = 1; i < scores.length; i++) {
             expect(scores[i]).toBeLessThan(scores[i - 1]);
         }
+    });
+});
+
+describe('rebuildIndex', () => {
+    it('应该重建索引并返回正确的计数', async (ctx) => {
+        requireEmbedding(ctx);
+        // 先保存几条笔记并索引
+        const n1 = await saveNote('rebuildTest 笔记一 alphaRebuild', ['rebuild'], 'opencode');
+        const n2 = await saveNote('rebuildTest 笔记二 betaRebuild', ['rebuild'], 'opencode');
+        await indexNote(n1);
+        await indexNote(n2);
+
+        // 验证索引前搜索能找到
+        let results = await searchNotes('alphaRebuild', 5);
+        expect(results.some((r) => r.id === n1.meta.id)).toBe(true);
+
+        // 重建索引
+        const stats = await rebuildIndex();
+        expect(stats.indexed).toBeGreaterThanOrEqual(2);
+        expect(stats.errors).toBe(0);
+
+        // 重建后仍能搜索到（关键词搜索验证笔记仍在磁盘上）
+        results = await searchNotes('betaRebuild', 5);
+        expect(results.some((r) => r.id === n2.meta.id)).toBe(true);
+    });
+
+    it('重建后应清理孤立的 metadata JSON 文件', async (ctx) => {
+        requireEmbedding(ctx);
+        const { indexDir } = await import('../src/core/config.js').then((m) => m.resolveStorageContext());
+
+        // 创建一个假的 metadata JSON 文件
+        const fakeMetaPath = path.join(indexDir, 'fake-orphan-metadata.json');
+        await fs.writeFile(fakeMetaPath, JSON.stringify({ id: 'fake' }));
+
+        // 确认文件存在
+        const existsBefore = await fs
+            .access(fakeMetaPath)
+            .then(() => true)
+            .catch(() => false);
+        expect(existsBefore).toBe(true);
+
+        // 重建索引
+        await rebuildIndex();
+
+        // 孤立文件应被清理
+        const existsAfter = await fs
+            .access(fakeMetaPath)
+            .then(() => true)
+            .catch(() => false);
+        expect(existsAfter).toBe(false);
     });
 });

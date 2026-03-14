@@ -10,17 +10,19 @@ describe('getPromptBlock', () => {
 
     it('应该包含核心指引内容', () => {
         const block = getPromptBlock();
-        expect(block).toContain('memory_search');
         expect(block).toContain('high-value long-term context');
+        expect(block).toContain('Save selectively');
         // compress 工具已移除，不应再出现
         expect(block).not.toContain('memory_compress');
         expect(block).not.toContain('memory_compress_apply');
+        // Search first 静态规则已移除（由 hook 机制取代）
+        expect(block).not.toContain('Search first');
     });
 
-    it('应该包含搜索优先规则', () => {
+    it('不应包含搜索优先静态规则（已由 hook 机制取代）', () => {
         const block = getPromptBlock();
-        expect(block).toContain('Search first');
-        expect(block).toContain('memory_search');
+        expect(block).not.toContain('Search first');
+        expect(block).not.toContain('START of each conversation');
     });
 
     it('应该包含保存阈值与去重引导', () => {
@@ -68,7 +70,7 @@ describe('getPromptBlock', () => {
         const block = getPromptBlock('openclaw');
         // base 内容
         expect(block).toContain('memory_save');
-        expect(block).toContain('memory_search');
+        expect(block).toContain('Save selectively');
         // 适配层内容
         expect(block).toContain('OpenClaw Integration');
         expect(block).toContain('daily memory file');

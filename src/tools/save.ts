@@ -70,7 +70,7 @@ export function registerSaveTool(server: McpServer): void {
                     await indexNote(note);
                 } catch (indexError) {
                     const reason = indexError instanceof Error ? indexError.message : String(indexError);
-                    indexWarning = `\n\nWarning: Memory saved to disk but semantic indexing failed (${reason}). The note will be available via memory_search after the embedding model finishes loading.`;
+                    indexWarning = `\n\nWarning: Memory saved to disk but semantic indexing failed (${reason}). The note is safely persisted and will be automatically indexed on next search via integrity repair.`;
                     console.error('Mnemo: indexing failed for note', note.meta.id, reason);
                 }
 

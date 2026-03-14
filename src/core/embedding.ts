@@ -1,10 +1,14 @@
 import { LocalIndex } from 'vectra';
+import fs from 'node:fs/promises';
+import path from 'node:path';
 import { ensureDir, resolveStorageContext, type Note } from './config.js';
 import { readAllNotes } from './notes.js';
 
 let embedder: any = null;
 let embedderLoading: Promise<any> | null = null;
 const indexInstances = new Map<string, LocalIndex>();
+/** Track dirs where integrity check has already passed */
+const integrityChecked = new Set<string>();
 
 /**
  * Load the embedding model.
@@ -54,7 +58,7 @@ export async function embed(text: string): Promise<number[]> {
 }
 
 /**
- * Get or create the vector index
+ * Get or create the vector index.
  */
 async function getIndex(): Promise<LocalIndex> {
     const { indexDir } = await resolveStorageContext();
@@ -75,7 +79,162 @@ async function getIndex(): Promise<LocalIndex> {
 
         indexInstances.set(indexDir, indexInstance);
     }
+
     return indexInstance;
+}
+
+/**
+ * Run index integrity check once per data dir per process lifetime.
+ * Should be called at read-path entry points (search, findSimilar)
+ * rather than write-path (save/indexNote) to avoid false positives
+ * during the normal save flow where a note is written to disk
+ * before being indexed.
+ */
+async function ensureIndexIntegrity(): Promise<void> {
+    const { indexDir } = await resolveStorageContext();
+    if (integrityChecked.has(indexDir) || !isEmbeddingReady()) return;
+    integrityChecked.add(indexDir);
+    try {
+        const index = await getIndex();
+        await checkAndRepairIndex(index, indexDir);
+    } catch (err) {
+        console.error('Mnemo: integrity check failed:', err instanceof Error ? err.message : String(err));
+    }
+}
+
+/**
+ * Compare notes on disk with entries in the vector index.
+ * If any inconsistency is found, rebuild the entire index.
+ *
+ * Inconsistency means:
+ * - A note file exists on disk but has no corresponding index entry
+ * - An index entry exists but its note file is missing from disk
+ */
+async function checkAndRepairIndex(index: LocalIndex, indexDir: string): Promise<void> {
+    const { notesDir } = await resolveStorageContext();
+
+    // Collect note IDs from disk
+    let noteFiles: string[];
+    try {
+        noteFiles = (await fs.readdir(notesDir)).filter((f) => f.endsWith('.md'));
+    } catch {
+        noteFiles = [];
+    }
+    const diskIds = new Set(noteFiles.map((f) => f.replace(/\.md$/, '')));
+
+    // Collect note IDs from index (stored in external metadata JSON files)
+    const items = await index.listItems();
+    const indexIds = new Set<string>();
+    for (const item of items) {
+        // When metadata_config.indexed is set, the real metadata (including id)
+        // lives in an external JSON file. We need to read it.
+        let noteId: string | undefined = (item.metadata as any).id;
+        if (!noteId && item.metadataFile) {
+            try {
+                const metaPath = path.join(indexDir, item.metadataFile);
+                const raw = await fs.readFile(metaPath, 'utf-8');
+                const meta = JSON.parse(raw);
+                noteId = meta.id;
+            } catch {
+                // metadata file missing or corrupt — definitely inconsistent
+            }
+        }
+        if (noteId) {
+            indexIds.add(noteId);
+        }
+    }
+
+    // Check consistency: both sets must match exactly
+    const missingFromIndex = [...diskIds].filter((id) => !indexIds.has(id));
+    const orphanInIndex = [...indexIds].filter((id) => !diskIds.has(id));
+
+    if (missingFromIndex.length === 0 && orphanInIndex.length === 0) {
+        return; // All good
+    }
+
+    console.error(
+        `Mnemo: index inconsistency detected — ` +
+            `${missingFromIndex.length} notes missing from index, ` +
+            `${orphanInIndex.length} orphan entries in index. Rebuilding...`,
+    );
+
+    await rebuildIndex(index, indexDir);
+}
+
+/**
+ * Rebuild the vector index from scratch.
+ * 1. Delete the existing index (including all external metadata JSON files)
+ * 2. Re-create an empty index
+ * 3. Re-index all notes currently on disk
+ *
+ * Also exported for manual/CLI use.
+ */
+export async function rebuildIndex(
+    existingIndex?: LocalIndex,
+    indexDir?: string,
+): Promise<{ indexed: number; errors: number }> {
+    if (!indexDir) {
+        const ctx = await resolveStorageContext();
+        indexDir = ctx.indexDir;
+    }
+
+    // Step 1: Clean up — remove all external metadata JSON files
+    try {
+        const files = await fs.readdir(indexDir);
+        const metaJsonFiles = files.filter((f) => f.endsWith('.json') && f !== 'index.json');
+        for (const f of metaJsonFiles) {
+            await fs.unlink(path.join(indexDir, f)).catch(() => {});
+        }
+    } catch {
+        // index dir might not exist yet
+    }
+
+    // Step 2: Delete and re-create the index
+    const index = existingIndex || new LocalIndex(indexDir);
+    if (await index.isIndexCreated()) {
+        await index.deleteIndex();
+    }
+    await ensureDir(indexDir);
+    await index.createIndex({
+        version: 1,
+        metadata_config: { indexed: ['source'] },
+    });
+
+    // Update cached instance
+    indexInstances.set(indexDir, index);
+
+    // Step 3: Re-index all notes from disk
+    const allNotes = await readAllNotes();
+    let indexed = 0;
+    let errors = 0;
+
+    for (const note of allNotes) {
+        try {
+            const vector = await embed(note.content);
+            await index.insertItem({
+                id: note.meta.id,
+                vector,
+                metadata: {
+                    id: note.meta.id,
+                    text: note.content.slice(0, 500),
+                    tags: note.meta.tags.join(','),
+                    source: note.meta.source,
+                    created: note.meta.created,
+                    type: note.meta.type || '',
+                },
+            });
+            indexed++;
+        } catch (err) {
+            errors++;
+            console.error(
+                `Mnemo: failed to re-index note ${note.meta.id}:`,
+                err instanceof Error ? err.message : String(err),
+            );
+        }
+    }
+
+    console.error(`Mnemo: index rebuilt — ${indexed} notes indexed, ${errors} errors`);
+    return { indexed, errors };
 }
 
 /**
@@ -101,6 +260,8 @@ export async function findSimilar(
     topK: number = 3,
 ): Promise<SimilarNote[]> {
     if (!isEmbeddingReady()) return [];
+
+    await ensureIndexIntegrity();
 
     const index = await getIndex();
     const vector = await embed(content);
@@ -137,13 +298,23 @@ export async function indexNote(note: Note): Promise<void> {
 }
 
 /**
- * Remove a note from the vector index
+ * Remove a note from the vector index.
+ * Also cleans up the external metadata JSON file if one exists.
  */
 export async function removeFromIndex(noteId: string): Promise<void> {
     const index = await getIndex();
     const item = await index.getItem(noteId);
     if (item) {
+        const metadataFile = (item as any).metadataFile as string | undefined;
         await index.deleteItem(noteId);
+
+        // Clean up external metadata JSON file (vectra doesn't do this)
+        if (metadataFile) {
+            const { indexDir } = await resolveStorageContext();
+            await fs.unlink(path.join(indexDir, metadataFile)).catch(() => {});
+        }
+    } else {
+        console.error(`Mnemo: removeFromIndex — note ${noteId} not found in index (may already be removed)`);
     }
 }
 
@@ -273,6 +444,9 @@ function mergeResults(
  * Falls back to keyword-only if embedding is not ready.
  */
 export async function searchNotes(query: string, topK: number = 5, sourceFilter?: string): Promise<SearchResult[]> {
+    // Run integrity check on first search call
+    await ensureIndexIntegrity();
+
     // Vector search
     let vectorResults: SearchResult[] = [];
     if (isEmbeddingReady()) {
@@ -290,6 +464,20 @@ export async function searchNotes(query: string, topK: number = 5, sourceFilter?
             created: r.item.metadata.created as string,
             type: (r.item.metadata.type as string) || '',
         }));
+
+        // Filter out results whose note files no longer exist on disk.
+        // This guards against stale index entries (e.g. after failed compress/eviction).
+        const { notesDir } = await resolveStorageContext();
+        const verified: SearchResult[] = [];
+        for (const r of vectorResults) {
+            try {
+                await fs.access(path.join(notesDir, `${r.id}.md`));
+                verified.push(r);
+            } catch {
+                // Note file missing — skip this stale index entry
+            }
+        }
+        vectorResults = verified;
     }
 
     // Keyword search
