@@ -118,9 +118,10 @@ This does two things:
 
 Both steps are independent — if one fails, the other still succeeds. Agent type is auto-detected from config files in the current directory and home directory.
 
-By default, setup initializes **global** memory shared across projects. For project-isolated memory:
+By default, setup initializes **global** memory shared across projects. For project-isolated memory, run in the project directory:
 
 ```bash
+cd your-project
 npx @s_s/mnemo setup --scope project
 ```
 
