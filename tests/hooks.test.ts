@@ -34,9 +34,10 @@ describe('reminders.ts — REMINDERS object', () => {
         expect(REMINDERS.sessionStart).toContain('memory_search');
     });
 
-    it('compaction 应该提醒保存和压缩', () => {
+    it('compaction 应该提醒保存重要上下文', () => {
         expect(REMINDERS.compaction).toContain('memory_save');
-        expect(REMINDERS.compaction).toContain('memory_compress');
+        // compress 已移除，compaction 不再提及 memory_compress
+        expect(REMINDERS.compaction).not.toContain('memory_compress');
     });
 
     it('sessionEnd 应该包含自检提示', () => {

@@ -212,6 +212,8 @@ export interface NoteMeta {
     tags: string[];
     source: string;
     type?: MemoryType;
+    accessCount?: number;
+    lastAccessed?: string;
 }
 
 /**
@@ -231,3 +233,26 @@ export const COMPRESS_THRESHOLDS = {
     /** Max total content size (chars) before auto-compress suggestion */
     maxTotalSize: 100_000,
 } as const;
+
+/**
+ * Eviction configuration for passive memory lifecycle management.
+ * When note count exceeds maxNotes, the lowest-scored notes are
+ * archived (or deleted) to keep the active set focused.
+ */
+export interface EvictionConfig {
+    /** Whether passive eviction is enabled. Default: true */
+    enabled: boolean;
+    /** Maximum number of active notes before eviction triggers. Default: 100 */
+    maxNotes: number;
+    /** Extra notes to evict beyond the overflow (reduces trigger frequency). Default: 10 */
+    evictBatch: number;
+    /** Move evicted notes to archive/ instead of deleting. Default: true */
+    archive: boolean;
+}
+
+export const DEFAULT_EVICTION_CONFIG: EvictionConfig = {
+    enabled: true,
+    maxNotes: 100,
+    evictBatch: 10,
+    archive: true,
+};

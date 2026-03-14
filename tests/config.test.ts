@@ -12,6 +12,8 @@ import {
     resolveStorageContext,
     MEMORY_TYPES,
     CLIENT_NAME_MAP,
+    DEFAULT_EVICTION_CONFIG,
+    type EvictionConfig,
 } from '../src/core/config.js';
 
 let originalEnv: NodeJS.ProcessEnv;
@@ -152,5 +154,27 @@ describe('CLIENT_NAME_MAP', () => {
     it('未知客户端名应返回 undefined', () => {
         expect(CLIENT_NAME_MAP['unknown-client']).toBeUndefined();
         expect(CLIENT_NAME_MAP['test-client']).toBeUndefined();
+    });
+});
+
+describe('EvictionConfig', () => {
+    it('DEFAULT_EVICTION_CONFIG 应有合理的默认值', () => {
+        expect(DEFAULT_EVICTION_CONFIG.enabled).toBe(true);
+        expect(DEFAULT_EVICTION_CONFIG.maxNotes).toBe(100);
+        expect(DEFAULT_EVICTION_CONFIG.evictBatch).toBe(10);
+        expect(DEFAULT_EVICTION_CONFIG.archive).toBe(true);
+    });
+
+    it('EvictionConfig 类型应包含所有必要字段', () => {
+        const config: EvictionConfig = {
+            enabled: false,
+            maxNotes: 50,
+            evictBatch: 5,
+            archive: false,
+        };
+        expect(config.enabled).toBe(false);
+        expect(config.maxNotes).toBe(50);
+        expect(config.evictBatch).toBe(5);
+        expect(config.archive).toBe(false);
     });
 });

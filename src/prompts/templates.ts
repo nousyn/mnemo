@@ -15,7 +15,6 @@ You have a persistent memory system (Mnemo). It preserves high-value long-term c
 - **Dedup before saving**: Check if similar memory exists. Prefer updating/replacing over creating duplicates.
 - **Distill, don't dump**: Save the essence, not raw conversation. No routine output or one-off debugging noise.
 - **Lifecycle**: Memories evolve — continuity\u2192decision (resolved), decision\u2192rule (becomes convention), continuity\u2192fact (answered). Close stale continuity threads.
-- **Compress** when notes accumulate: memory_compress \u2192 distill \u2192 memory_compress_apply.
 `.trim();
 
 /**
@@ -27,8 +26,7 @@ const AGENT_MEMORY_PROMPTS: Partial<Record<AgentType, string>> = {
 
 ### OpenClaw Integration:
 - After each memory_save, also append the same content to your daily memory file (memory/YYYY-MM-DD.md) to keep OpenClaw's built-in memory in sync
-- When you write to daily memory (memory/YYYY-MM-DD.md) or update MEMORY.md, also call memory_save to ensure cross-agent persistence
-- During heartbeat memory maintenance (reviewing daily files → updating MEMORY.md), also call memory_compress to consolidate Mnemo memories`,
+- When you write to daily memory (memory/YYYY-MM-DD.md) or update MEMORY.md, also call memory_save to ensure cross-agent persistence`,
 };
 
 /**

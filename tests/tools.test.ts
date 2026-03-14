@@ -8,7 +8,7 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { registerSaveTool } from '../src/tools/save.js';
 import { registerSearchTool } from '../src/tools/search.js';
 import { registerGetTool } from '../src/tools/get.js';
-import { registerCompressTool } from '../src/tools/compress.js';
+import { registerDeleteTool } from '../src/tools/compress.js';
 import { runSetup } from '../src/tools/setup.js';
 import { preloadEmbedding, embed } from '../src/core/embedding.js';
 import { extractSummary } from '../src/tools/search.js';
@@ -43,7 +43,7 @@ beforeAll(async () => {
     registerSaveTool(server);
     registerSearchTool(server);
     registerGetTool(server);
-    registerCompressTool(server);
+    registerDeleteTool(server);
 
     const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
     await server.connect(serverTransport);
@@ -64,28 +64,26 @@ function getResponseText(result: any): string {
 }
 
 describe('tools/list', () => {
-    it('应该列出所有 6 个工具', async () => {
+    it('应该列出所有 4 个工具（compress 已移除）', async () => {
         const { tools } = await client.listTools();
         const names = tools.map((t) => t.name).sort();
-        expect(names).toEqual([
-            'memory_compress',
-            'memory_compress_apply',
-            'memory_delete',
-            'memory_get',
-            'memory_save',
-            'memory_search',
-        ]);
+        expect(names).toEqual(['memory_delete', 'memory_get', 'memory_save', 'memory_search']);
     });
 
     it('关键工具描述应体现长期上下文定位', async () => {
         const { tools } = await client.listTools();
         const saveTool = tools.find((t) => t.name === 'memory_save');
         const searchTool = tools.find((t) => t.name === 'memory_search');
-        const compressTool = tools.find((t) => t.name === 'memory_compress');
 
         expect(saveTool?.description).toContain('high-value long-term context');
         expect(searchTool?.description).toContain('long-term context');
-        expect(compressTool?.description).toContain('durable high-value context');
+    });
+
+    it('不应包含已移除的 compress 工具', async () => {
+        const { tools } = await client.listTools();
+        const names = tools.map((t) => t.name);
+        expect(names).not.toContain('memory_compress');
+        expect(names).not.toContain('memory_compress_apply');
     });
 });
 
@@ -461,64 +459,6 @@ describe('memory_get 工具', () => {
     });
 });
 
-describe('memory_compress 工具', () => {
-    it('review 策略应返回所有笔记供蒸馏', async () => {
-        const result = await client.callTool({
-            name: 'memory_compress',
-            arguments: { strategy: 'review' },
-        });
-
-        const text = getResponseText(result);
-        expect(text).toContain('memories to compress');
-        expect(text).toContain('memory_compress_apply');
-        expect(text).toContain('"old_ids"');
-    });
-
-    it('auto_tag 策略应返回标签统计', async () => {
-        const result = await client.callTool({
-            name: 'memory_compress',
-            arguments: { strategy: 'auto_tag' },
-        });
-
-        const text = getResponseText(result);
-        expect(text).toContain('Memory statistics');
-        expect(text).toContain('Tag distribution');
-    });
-
-    it('older_than_days 过滤应生效', async () => {
-        // 所有笔记都是刚创建的，用 1 天过滤应该找不到
-        const result = await client.callTool({
-            name: 'memory_compress',
-            arguments: { strategy: 'review', older_than_days: 1 },
-        });
-
-        const text = getResponseText(result);
-        expect(text).toContain('No memories older than');
-    });
-
-    it('review 输出应包含有 type 的笔记的类型信息', async () => {
-        // 先保存一条有 type 的笔记
-        await client.callTool({
-            name: 'memory_save',
-            arguments: {
-                content: 'compress type 显示测试 compressTypeDisplay',
-                type: 'goal',
-                tags: ['compress-type-test'],
-                source: 'opencode',
-            },
-        });
-
-        const result = await client.callTool({
-            name: 'memory_compress',
-            arguments: { strategy: 'review' },
-        });
-
-        const text = getResponseText(result);
-        expect(text).toContain('compressTypeDisplay');
-        expect(text).toContain('[Type: goal]');
-    });
-});
-
 describe('memory_delete 工具', () => {
     it('应该成功删除指定笔记', async () => {
         const saveResult = await client.callTool({
@@ -551,106 +491,6 @@ describe('memory_delete 工具', () => {
 
         const text = getResponseText(result);
         expect(text).toContain('Deleted 0 of 1');
-    });
-});
-
-describe('memory_compress_apply 工具', () => {
-    it('应该原子性地保存新笔记并删除旧笔记', async () => {
-        // 先保存两条笔记
-        const save1 = await client.callTool({
-            name: 'memory_save',
-            arguments: { content: '压缩测试笔记 A', type: 'fact', tags: ['compress-test'], source: 'opencode' },
-        });
-        const save2 = await client.callTool({
-            name: 'memory_save',
-            arguments: { content: '压缩测试笔记 B', type: 'fact', tags: ['compress-test'], source: 'opencode' },
-        });
-
-        const id1 = getResponseText(save1).match(/ID: ([\w-]+)/)?.[1];
-        const id2 = getResponseText(save2).match(/ID: ([\w-]+)/)?.[1];
-        expect(id1).toBeTruthy();
-        expect(id2).toBeTruthy();
-
-        // 用 compress_apply 把两条蒸馏成一条
-        const result = await client.callTool({
-            name: 'memory_compress_apply',
-            arguments: {
-                notes: [{ content: '蒸馏后的合并笔记 AB', tags: ['compressed'] }],
-                old_ids: [id1!, id2!],
-                source: 'opencode',
-            },
-        });
-
-        const text = getResponseText(result);
-        expect(text).toContain('Compression applied successfully');
-        expect(text).toContain('New notes saved: 1');
-        expect(text).toContain('Old notes deleted: 2 of 2');
-    });
-
-    it('旧 ID 不存在时也应成功（删除 0 条）', async () => {
-        const result = await client.callTool({
-            name: 'memory_compress_apply',
-            arguments: {
-                notes: [{ content: '新笔记', tags: ['test'] }],
-                old_ids: ['nonexistent-id-1', 'nonexistent-id-2'],
-                source: 'opencode',
-            },
-        });
-
-        const text = getResponseText(result);
-        expect(text).toContain('Compression applied successfully');
-        expect(text).toContain('New notes saved: 1');
-        expect(text).toContain('Old notes deleted: 0 of 2');
-    });
-
-    it('应该可以保存多条蒸馏笔记', async () => {
-        const result = await client.callTool({
-            name: 'memory_compress_apply',
-            arguments: {
-                notes: [
-                    { content: '蒸馏笔记 1', tags: ['a'] },
-                    { content: '蒸馏笔记 2', tags: ['b'] },
-                    { content: '蒸馏笔记 3', tags: ['c'] },
-                ],
-                old_ids: [],
-                source: 'opencode',
-            },
-        });
-
-        const text = getResponseText(result);
-        expect(text).toContain('New notes saved: 3');
-        expect(text).toContain('Old notes deleted: 0 of 0');
-    });
-
-    it('蒸馏笔记应支持 type 字段', async () => {
-        const save1 = await client.callTool({
-            name: 'memory_save',
-            arguments: {
-                content: 'compress_apply type 测试原始笔记',
-                type: 'fact',
-                tags: ['ca-type'],
-                source: 'opencode',
-            },
-        });
-        const id1 = getResponseText(save1).match(/ID: ([\w-]+)/)?.[1];
-        expect(id1).toBeTruthy();
-
-        const result = await client.callTool({
-            name: 'memory_compress_apply',
-            arguments: {
-                notes: [
-                    { content: '蒸馏后的决策笔记', tags: ['compressed'], type: 'decision' },
-                    { content: '蒸馏后的规则笔记', tags: ['compressed'], type: 'rule' },
-                ],
-                old_ids: [id1!],
-                source: 'opencode',
-            },
-        });
-
-        const text = getResponseText(result);
-        expect(text).toContain('Compression applied successfully');
-        expect(text).toContain('New notes saved: 2');
-        expect(text).toContain('Old notes deleted: 1 of 1');
     });
 });
 

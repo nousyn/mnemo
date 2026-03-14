@@ -1,8 +1,9 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { saveNote, getNoteStats } from '../core/notes.js';
+import { saveNote } from '../core/notes.js';
 import { indexNote, isEmbeddingReady, findSimilar } from '../core/embedding.js';
-import { COMPRESS_THRESHOLDS, MEMORY_TYPES } from '../core/config.js';
+import { MEMORY_TYPES } from '../core/config.js';
+import { runEviction } from '../core/eviction.js';
 
 /**
  * Register the memory_save tool
@@ -54,7 +55,7 @@ export function registerSaveTool(server: McpServer): void {
                                     `  - ID: ${s.id} (similarity: ${(s.score * 100).toFixed(1)}%) — ${s.text.slice(0, 100)}...`,
                             )
                             .join('\n');
-                        dedupWarning = `\n\nWarning: Similar memories already exist:\n${summaries}\nConsider using memory_get to check if this is a duplicate, or memory_compress to consolidate.`;
+                        dedupWarning = `\n\nWarning: Similar memories already exist:\n${summaries}\nConsider using memory_get to check if this is a duplicate, or memory_delete to remove outdated ones.`;
                     }
                 } catch {
                     // Best effort — don't block save if dedup check fails
@@ -73,24 +74,21 @@ export function registerSaveTool(server: McpServer): void {
                     console.error('Mnemo: indexing failed for note', note.meta.id, reason);
                 }
 
-                // Check if compression might be needed (program-level guardrail)
-                const stats = await getNoteStats();
-                let compressHint = '';
-
-                if (stats.count > COMPRESS_THRESHOLDS.maxNotes || stats.totalSize > COMPRESS_THRESHOLDS.maxTotalSize) {
-                    compressHint = `\n\nNote: Memory storage is growing large (${stats.count} notes, ${Math.round(stats.totalSize / 1000)}KB). Consider running memory_compress to consolidate and distill older memories.`;
-                }
-
                 const typeLine = `\nType: ${note.meta.type}`;
                 const typeHint = !type
                     ? '\n\nWARNING: No type specified — force-defaulted to "fact". Always specify the correct type before saving. Untyped memories degrade retrieval quality.'
                     : '';
 
+                // Trigger passive eviction in the background (fire-and-forget)
+                runEviction().catch((err) => {
+                    console.error('Mnemo: eviction failed:', err instanceof Error ? err.message : String(err));
+                });
+
                 return {
                     content: [
                         {
                             type: 'text' as const,
-                            text: `Memory saved successfully.\n\nID: ${note.meta.id}${typeLine}\nTags: [${note.meta.tags.join(', ')}]${typeHint}${dedupWarning}${indexWarning}${compressHint}`,
+                            text: `Memory saved successfully.\n\nID: ${note.meta.id}${typeLine}\nTags: [${note.meta.tags.join(', ')}]${typeHint}${dedupWarning}${indexWarning}`,
                         },
                     ],
                 };

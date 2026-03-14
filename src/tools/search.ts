@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { searchNotes, isEmbeddingReady } from '../core/embedding.js';
 import { MEMORY_TYPES } from '../core/config.js';
+import { recordAccessBatch } from '../core/access-tracker.js';
 
 /**
  * Extract a summary from note content: first line, or first ~200 chars.
@@ -86,6 +87,10 @@ export function registerSearchTool(server: McpServer): void {
                         ],
                     };
                 }
+
+                // Record access for all returned results (fire-and-forget)
+                const returnedIds = results.map((r) => r.id);
+                recordAccessBatch(returnedIds).catch(() => {});
 
                 // Return summaries instead of full content
                 const output = results

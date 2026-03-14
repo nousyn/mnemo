@@ -70,6 +70,12 @@ export function parseNote(raw: string): Note | null {
                     .map((t) => t.trim())
                     .filter(Boolean);
                 break;
+            case 'accessCount':
+                meta.accessCount = parseInt(value, 10) || 0;
+                break;
+            case 'lastAccessed':
+                meta.lastAccessed = value;
+                break;
         }
     }
 
@@ -83,6 +89,8 @@ export function parseNote(raw: string): Note | null {
             tags: meta.tags || [],
             source: meta.source || 'unknown',
             ...(meta.type ? { type: meta.type } : {}),
+            ...(meta.accessCount !== undefined ? { accessCount: meta.accessCount } : {}),
+            ...(meta.lastAccessed ? { lastAccessed: meta.lastAccessed } : {}),
         },
         content,
     };
@@ -102,6 +110,12 @@ export function serializeNote(note: Note): string {
     ];
     if (note.meta.type) {
         lines.push(`type: ${note.meta.type}`);
+    }
+    if (note.meta.accessCount !== undefined && note.meta.accessCount > 0) {
+        lines.push(`accessCount: ${note.meta.accessCount}`);
+    }
+    if (note.meta.lastAccessed) {
+        lines.push(`lastAccessed: ${note.meta.lastAccessed}`);
     }
     lines.push('---', '', note.content);
     return lines.join('\n') + '\n';
@@ -218,4 +232,51 @@ export async function getNoteStats(): Promise<{
         totalSize += note.content.length;
     }
     return { count: notes.length, totalSize };
+}
+
+/**
+ * Update metadata fields of an existing note on disk.
+ * Reads the note, merges the provided meta fields, and writes it back.
+ */
+export async function updateNoteMeta(
+    id: string,
+    updates: Partial<Pick<NoteMeta, 'accessCount' | 'lastAccessed'>>,
+): Promise<boolean> {
+    const { notesDir } = await resolveStorageContext();
+    const filePath = path.join(notesDir, `${id}.md`);
+    try {
+        const raw = await fs.readFile(filePath, 'utf-8');
+        const note = parseNote(raw);
+        if (!note) return false;
+
+        if (updates.accessCount !== undefined) {
+            note.meta.accessCount = updates.accessCount;
+        }
+        if (updates.lastAccessed !== undefined) {
+            note.meta.lastAccessed = updates.lastAccessed;
+        }
+
+        await fs.writeFile(filePath, serializeNote(note), 'utf-8');
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * Move a note file to the archive directory.
+ * Returns true if moved successfully, false otherwise.
+ */
+export async function archiveNote(id: string): Promise<boolean> {
+    const { dataDir, notesDir } = await resolveStorageContext();
+    const srcPath = path.join(notesDir, `${id}.md`);
+    const archiveDir = path.join(dataDir, 'archive');
+    const destPath = path.join(archiveDir, `${id}.md`);
+    try {
+        await ensureDir(archiveDir);
+        await fs.rename(srcPath, destPath);
+        return true;
+    } catch {
+        return false;
+    }
 }

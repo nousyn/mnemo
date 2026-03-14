@@ -11,9 +11,10 @@ describe('getPromptBlock', () => {
     it('应该包含核心指引内容', () => {
         const block = getPromptBlock();
         expect(block).toContain('memory_search');
-        expect(block).toContain('memory_compress');
-        expect(block).toContain('memory_compress_apply');
         expect(block).toContain('high-value long-term context');
+        // compress 工具已移除，不应再出现
+        expect(block).not.toContain('memory_compress');
+        expect(block).not.toContain('memory_compress_apply');
     });
 
     it('应该包含搜索优先规则', () => {
@@ -43,8 +44,8 @@ describe('getPromptBlock', () => {
     it('应该包含生命周期演变规则', () => {
         const block = getPromptBlock();
         expect(block).toContain('Lifecycle');
-        expect(block).toContain('Compress');
-        expect(block).toContain('memory_compress_apply');
+        // compress 引用已移除，生命周期现在描述演变路径而非压缩操作
+        expect(block).not.toContain('memory_compress');
     });
 
     it('应该包含蒸馏而非转储的指引', () => {
@@ -71,7 +72,8 @@ describe('getPromptBlock', () => {
         // 适配层内容
         expect(block).toContain('OpenClaw Integration');
         expect(block).toContain('daily memory file');
-        expect(block).toContain('memory_compress to consolidate');
+        // compress 已移除
+        expect(block).not.toContain('memory_compress');
     });
 });
 

@@ -11,7 +11,6 @@ export const REMINDERS = {
 After this task, briefly self-check:
 - Did a durable preference, decision, or rule emerge? → memory_save
 - Is there an unresolved thread to resume later? → memory_save (continuity)
-- Did context window reset? → memory_compress
 If nothing qualifies, skip. Don't force saves.
 </mnemo-reminder>`,
 
@@ -25,7 +24,6 @@ Call memory_search with a query based on the user's message.
     compaction: `<mnemo-compaction>
 Context is being compacted. Before losing context:
 1. Save any important unresolved threads as continuity memories (memory_save)
-2. Call memory_compress if many notes have accumulated
 </mnemo-compaction>`,
 
     /** Session end / idle self-check */

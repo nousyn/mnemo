@@ -60,7 +60,7 @@ async function runMcpServer() {
     const { StdioServerTransport } = await import('@modelcontextprotocol/sdk/server/stdio.js');
     const { registerSaveTool } = await import('./tools/save.js');
     const { registerSearchTool } = await import('./tools/search.js');
-    const { registerCompressTool } = await import('./tools/compress.js');
+    const { registerDeleteTool } = await import('./tools/compress.js');
     const { registerGetTool } = await import('./tools/get.js');
     const { preloadEmbedding } = await import('./core/embedding.js');
 
@@ -70,11 +70,11 @@ async function runMcpServer() {
         description: 'Memory management for AI coding assistants',
     });
 
-    // Register all tools (6 tools: save, search, get, compress, delete, compress_apply)
+    // Register all tools (4 tools: save, search, get, delete)
     registerSaveTool(server);
     registerSearchTool(server);
     registerGetTool(server);
-    registerCompressTool(server);
+    registerDeleteTool(server);
 
     // Start loading the embedding model in the background immediately
     // so it's ready before the first tool call

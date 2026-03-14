@@ -11,6 +11,8 @@ import {
     deleteNote,
     deleteNotes,
     getNoteStats,
+    updateNoteMeta,
+    archiveNote,
 } from '../src/core/notes.js';
 import { writeStorageConfig, type Note, MEMORY_TYPES } from '../src/core/config.js';
 
@@ -359,5 +361,163 @@ describe('getNoteStats', () => {
         const stats = await getNoteStats();
         expect(stats.count).toBe(2);
         expect(stats.totalSize).toBeGreaterThan(0);
+    });
+});
+
+describe('parseNote — accessCount / lastAccessed', () => {
+    it('应该正确解析带 accessCount 的笔记', () => {
+        const raw = `---
+id: access1234
+created: 2026-01-01T00:00:00.000Z
+updated: 2026-01-01T00:00:00.000Z
+tags: [test]
+source: opencode
+accessCount: 5
+lastAccessed: 2026-01-10T12:00:00.000Z
+---
+
+带访问计数的笔记`;
+
+        const note = parseNote(raw);
+        expect(note).not.toBeNull();
+        expect(note!.meta.accessCount).toBe(5);
+        expect(note!.meta.lastAccessed).toBe('2026-01-10T12:00:00.000Z');
+    });
+
+    it('无 accessCount 时应为 undefined（向后兼容）', () => {
+        const raw = `---
+id: noaccess123
+created: 2026-01-01T00:00:00.000Z
+updated: 2026-01-01T00:00:00.000Z
+tags: []
+source: opencode
+---
+
+无访问计数笔记`;
+
+        const note = parseNote(raw);
+        expect(note).not.toBeNull();
+        expect(note!.meta.accessCount).toBeUndefined();
+        expect(note!.meta.lastAccessed).toBeUndefined();
+    });
+});
+
+describe('serializeNote — accessCount / lastAccessed', () => {
+    it('带 accessCount > 0 时应正确序列化', () => {
+        const note: Note = {
+            meta: {
+                id: 'access1234',
+                created: '2026-01-01T00:00:00.000Z',
+                updated: '2026-01-01T00:00:00.000Z',
+                tags: ['test'],
+                source: 'opencode',
+                accessCount: 3,
+                lastAccessed: '2026-01-10T12:00:00.000Z',
+            },
+            content: '访问计数序列化测试',
+        };
+
+        const result = serializeNote(note);
+        expect(result).toContain('accessCount: 3');
+        expect(result).toContain('lastAccessed: 2026-01-10T12:00:00.000Z');
+    });
+
+    it('accessCount 为 0 或 undefined 时不应序列化', () => {
+        const note: Note = {
+            meta: {
+                id: 'noaccess123',
+                created: '2026-01-01T00:00:00.000Z',
+                updated: '2026-01-01T00:00:00.000Z',
+                tags: [],
+                source: 'opencode',
+            },
+            content: '无访问计数',
+        };
+
+        const result = serializeNote(note);
+        expect(result).not.toContain('accessCount');
+        expect(result).not.toContain('lastAccessed');
+    });
+
+    it('accessCount 的 parse/serialize 应互逆', () => {
+        const note: Note = {
+            meta: {
+                id: 'roundaccess',
+                created: '2026-01-01T00:00:00.000Z',
+                updated: '2026-01-02T00:00:00.000Z',
+                tags: ['test'],
+                source: 'opencode',
+                type: 'fact',
+                accessCount: 7,
+                lastAccessed: '2026-01-15T08:00:00.000Z',
+            },
+            content: '访问计数往返测试',
+        };
+
+        const serialized = serializeNote(note);
+        const parsed = parseNote(serialized);
+        expect(parsed).not.toBeNull();
+        expect(parsed!.meta.accessCount).toBe(7);
+        expect(parsed!.meta.lastAccessed).toBe('2026-01-15T08:00:00.000Z');
+    });
+});
+
+describe('updateNoteMeta', () => {
+    it('应该更新 accessCount 和 lastAccessed', async () => {
+        const note = await saveNote('更新元数据测试', ['test'], 'opencode');
+
+        const success = await updateNoteMeta(note.meta.id, {
+            accessCount: 3,
+            lastAccessed: '2026-02-01T00:00:00.000Z',
+        });
+        expect(success).toBe(true);
+
+        const read = await readNote(note.meta.id);
+        expect(read).not.toBeNull();
+        expect(read!.meta.accessCount).toBe(3);
+        expect(read!.meta.lastAccessed).toBe('2026-02-01T00:00:00.000Z');
+    });
+
+    it('应该只更新指定的字段', async () => {
+        const note = await saveNote('部分更新测试', ['test'], 'opencode', 'fact');
+
+        await updateNoteMeta(note.meta.id, { accessCount: 1 });
+
+        const read = await readNote(note.meta.id);
+        expect(read).not.toBeNull();
+        expect(read!.meta.accessCount).toBe(1);
+        expect(read!.meta.lastAccessed).toBeUndefined();
+        // 原有字段应保持不变
+        expect(read!.meta.type).toBe('fact');
+        expect(read!.meta.source).toBe('opencode');
+        expect(read!.content).toBe('部分更新测试');
+    });
+
+    it('不存在的笔记应返回 false', async () => {
+        const result = await updateNoteMeta('nonexistent-id', { accessCount: 1 });
+        expect(result).toBe(false);
+    });
+});
+
+describe('archiveNote', () => {
+    it('应该将笔记移到 archive 目录', async () => {
+        const note = await saveNote('归档测试', ['test'], 'opencode');
+
+        const success = await archiveNote(note.meta.id);
+        expect(success).toBe(true);
+
+        // 原位置不再存在
+        const read = await readNote(note.meta.id);
+        expect(read).toBeNull();
+
+        // archive 目录应有文件
+        const archivePath = path.join(tmpDir, 'archive', `${note.meta.id}.md`);
+        const content = await fs.readFile(archivePath, 'utf-8');
+        expect(content).toContain('归档测试');
+    });
+
+    it('不存在的笔记应返回 false', async () => {
+        const result = await archiveNote('nonexistent-id');
+        expect(result).toBe(false);
     });
 });

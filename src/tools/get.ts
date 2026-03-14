@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { readNote } from '../core/notes.js';
+import { recordAccessBatch } from '../core/access-tracker.js';
 
 /**
  * Register the memory_get tool
@@ -54,6 +55,10 @@ export function registerGetTool(server: McpServer): void {
                         ],
                     };
                 }
+
+                // Record access for all found results (fire-and-forget)
+                const foundIds = results.map((r) => r.id);
+                recordAccessBatch(foundIds).catch(() => {});
 
                 const output = results
                     .map(

@@ -17,7 +17,7 @@ Mnemo is not a transcript archive. It captures only the context that will still 
 - **Multi-agent support** — works with OpenCode, Claude Code, OpenClaw, and Codex; auto-detects agent type via MCP protocol
 - **Fully local** — no API calls, no cloud storage; all data stays on your machine
 - **Auto-prompted** — injects instructions into your agent's config so it knows when to save and recall memories
-- **Compression workflow** — atomic distillation of old notes into fewer, concise ones
+- **Passive eviction** — automatic lifecycle management based on access frequency + time decay; old, unused memories are archived to keep the active set focused
 
 ## Quick Start
 
@@ -179,31 +179,16 @@ Agent: → [calls memory_search: "database choice"]
        its type safety and migration tooling.
 ```
 
-### Compressing memories
-
-When memories accumulate, you can ask the agent to clean up:
-
-```
-You:   We have a lot of memories now. Can you clean them up?
-Agent: → [calls memory_compress]
-       I found 23 memories. Let me distill them into fewer notes...
-       → [calls memory_compress_apply: saves 8 distilled notes,
-          deletes 23 originals]
-       Done. Compressed 23 memories into 8 concise notes.
-```
-
 ## Tools
 
-Mnemo provides 6 MCP tools:
+Mnemo provides 4 MCP tools:
 
-| Tool                    | Description                                                         |
-| ----------------------- | ------------------------------------------------------------------- |
-| `memory_save`           | Save a memory note with type, optional tags, and source             |
-| `memory_search`         | Hybrid search across memories; returns summaries (supports filters) |
-| `memory_get`            | Retrieve full content of specific notes by ID                       |
-| `memory_compress`       | List all notes for review/distillation                              |
-| `memory_compress_apply` | Atomically save distilled notes and delete originals                |
-| `memory_delete`         | Delete notes by ID                                                  |
+| Tool            | Description                                                         |
+| --------------- | ------------------------------------------------------------------- |
+| `memory_save`   | Save a memory note with type, optional tags, and source             |
+| `memory_search` | Hybrid search across memories; returns summaries (supports filters) |
+| `memory_get`    | Retrieve full content of specific notes by ID                       |
+| `memory_delete` | Delete notes by ID                                                  |
 
 ## Memory Model
 
@@ -264,7 +249,7 @@ Search results return summaries by default. Use `memory_get` with note IDs to re
 
 1. **Save** — Agent saves key info during conversations (decisions, preferences, architecture choices, or when context is running low)
 2. **Search** — Agent retrieves relevant context at the start of new conversations or when needed
-3. **Compress** — When notes accumulate, the agent distills them into fewer, concise notes via `memory_compress` → review → `memory_compress_apply`
+3. **Eviction** — When notes exceed the configured limit, the lowest-scored notes (by access frequency + time decay) are automatically archived to keep the active set focused
 
 ## Development
 
