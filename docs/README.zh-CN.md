@@ -103,10 +103,10 @@ mcporter config add mnemo --command mnemo --scope home
 
 ### 初始化
 
-连接后，调用 `memory_setup` 工具初始化 Mnemo：
+安装后，运行 CLI 命令初始化 Mnemo：
 
-```
-> 使用 memory_setup 工具初始化 Mnemo
+```bash
+npx @s_s/mnemo setup
 ```
 
 这会执行两个步骤：
@@ -114,29 +114,32 @@ mcporter config add mnemo --command mnemo --scope home
 1. **提示注入** — 将记忆管理指令写入 Agent 配置文件（如 OpenCode 的 `AGENTS.md`、Claude Code 的 `CLAUDE.md`）
 2. **Hook 安装** — 安装生命周期 hook，在关键时刻提醒 Agent 使用记忆工具（Claude Code/Codex 每轮提醒，OpenClaw 会话启动时提醒，OpenCode 会话生命周期事件提醒）
 
-两个步骤相互独立——其中一个失败不影响另一个。Agent 类型通过 MCP 协议自动检测，文件检测作为降级方案。
+两个步骤相互独立——其中一个失败不影响另一个。Agent 类型通过当前目录和 home 目录下的配置文件自动检测。
 
-默认情况下，`memory_setup()` 会初始化为**全局记忆**，在多个项目之间共享。如果你需要项目隔离的记忆，请在调用 `memory_setup` 时传入 `scope: "project"`。
+默认初始化为**全局记忆**，在多个项目之间共享。如果你需要项目隔离的记忆：
+
+```bash
+npx @s_s/mnemo setup --scope project
+```
+
+选项：
+
+| 参数              | 说明                                      |
+| ----------------- | ----------------------------------------- |
+| `--agent <type>`  | Agent 类型（省略则自动检测）              |
+| `--scope <scope>` | `global`（默认）或 `project`              |
+| `--project-root`  | 显式指定项目根目录（用于 project 作用域） |
 
 ### 存储作用域
 
 - `global`（默认）— 跨项目共享记忆；提示词写入用户级 Agent 配置
 - `project` — 当前项目独立记忆；提示词写入项目级配置，并在项目内创建 `.mnemo/` 目录
 
-当使用 `scope: "project"` 时，也可以额外传入 `project_root`，显式指定项目根目录。
+当使用 `--scope project` 时，也可以传入 `--project-root <path>`，显式指定项目根目录。
 
 ## 使用示例
 
-> **重要：** 你不需要直接调用 Mnemo 的工具。你只需用自然语言和 AI Agent 对话，Agent 会在幕后自动判断何时调用 Mnemo 工具。运行 `memory_setup` 后，Agent 就已经知道何时以及如何使用它们了。
-
-### 首次初始化
-
-```
-你:     帮我设置一下 Mnemo 记忆管理
-Agent:  好的，我来初始化 Mnemo。
-        → [调用 memory_setup 工具]
-        Mnemo 已初始化完成，我已将记忆管理指令写入 AGENTS.md 文件。
-```
+> **重要：** 你不需要直接调用 Mnemo 的工具。你只需用自然语言和 AI Agent 对话，Agent 会在幕后自动判断何时调用 Mnemo 工具。运行 `npx @s_s/mnemo setup` 后，Agent 就已经知道何时以及如何使用它们了。
 
 ### 自动保存记忆
 
@@ -187,11 +190,10 @@ Agent:  → [调用 memory_compress]
 
 ## 工具
 
-Mnemo 提供 7 个 MCP 工具：
+Mnemo 提供 6 个 MCP 工具：
 
 | 工具                    | 说明                                         |
 | ----------------------- | -------------------------------------------- |
-| `memory_setup`          | 初始化 Mnemo — 注入使用指令并建立存储作用域  |
 | `memory_save`           | 保存记忆笔记，需指定类型，可附带标签和来源   |
 | `memory_search`         | 混合搜索记忆，返回摘要（支持来源和标签过滤） |
 | `memory_get`            | 按 ID 获取笔记完整内容                       |
@@ -246,7 +248,7 @@ Mnemo 提供 7 个 MCP 工具：
 
 可通过 `MNEMO_DATA_DIR` 环境变量覆盖全局数据目录。
 
-注意：使用其他记忆工具前，必须先运行 `memory_setup` 完成初始化。存储解析顺序是：先找项目级 marker，再找全局 marker；两者都不存在时，Mnemo 会提示当前环境尚未初始化。
+注意：使用记忆工具前，必须先运行 `npx @s_s/mnemo setup` 完成初始化。存储解析顺序是：先找项目级 marker，再找全局 marker；两者都不存在时，Mnemo 会提示当前环境尚未初始化。
 
 ### 混合搜索
 

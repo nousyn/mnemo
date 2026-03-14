@@ -105,10 +105,10 @@ mcporter config add mnemo --command mnemo --scope home
 
 ### Initialize
 
-Once connected, call the `memory_setup` tool to initialize Mnemo:
+After installing, run the setup CLI to initialize Mnemo:
 
-```
-> Use the memory_setup tool to initialize Mnemo
+```bash
+npx @s_s/mnemo setup
 ```
 
 This does two things:
@@ -116,30 +116,32 @@ This does two things:
 1. **Prompt injection** — writes memory management instructions into your agent's config file (e.g., `AGENTS.md` for OpenCode, `CLAUDE.md` for Claude Code)
 2. **Hook installation** — installs lifecycle hooks that remind the agent to use memory tools at key moments (per-turn for Claude Code/Codex, session-start for OpenClaw, session lifecycle events for OpenCode)
 
-Both steps are independent — if one fails, the other still succeeds. Agent type is auto-detected via MCP protocol, with file-based detection as fallback.
+Both steps are independent — if one fails, the other still succeeds. Agent type is auto-detected from config files in the current directory and home directory.
 
-By default, `memory_setup()` initializes **global** memory shared across projects. If you want project-isolated memory, call `memory_setup` with `scope: "project"`.
+By default, setup initializes **global** memory shared across projects. For project-isolated memory:
+
+```bash
+npx @s_s/mnemo setup --scope project
+```
+
+Options:
+
+| Flag              | Description                               |
+| ----------------- | ----------------------------------------- |
+| `--agent <type>`  | Agent type (auto-detected if omitted)     |
+| `--scope <scope>` | `global` (default) or `project`           |
+| `--project-root`  | Explicit project root (for project scope) |
 
 ### Storage scopes
 
 - `global` (default) — shared memory across projects; prompt is written to the user-level agent config
 - `project` — isolated memory for the current project; prompt is written to the project config and Mnemo creates a local `.mnemo/` directory
 
-You can also pass `project_root` when using `scope: "project"` to explicitly choose the project root.
+You can also pass `--project-root <path>` when using `--scope project` to explicitly choose the project root.
 
 ## Usage Examples
 
-> **Important:** You don't call Mnemo tools directly. You chat with your AI agent in natural language, and the agent decides when to call Mnemo tools behind the scenes. After running `memory_setup`, the agent already knows when and how to use them.
-
-### First-time setup
-
-```
-You:   Help me set up Mnemo for memory management
-Agent: I'll initialize Mnemo for you.
-       → [calls memory_setup tool]
-       Mnemo has been initialized. I've added memory management
-       instructions to your AGENTS.md file.
-```
+> **Important:** You don't call Mnemo tools directly. You chat with your AI agent in natural language, and the agent decides when to call Mnemo tools behind the scenes. After running `npx @s_s/mnemo setup`, the agent already knows when and how to use them.
 
 ### Saving memories (automatic)
 
@@ -191,11 +193,10 @@ Agent: → [calls memory_compress]
 
 ## Tools
 
-Mnemo provides 7 MCP tools:
+Mnemo provides 6 MCP tools:
 
 | Tool                    | Description                                                         |
 | ----------------------- | ------------------------------------------------------------------- |
-| `memory_setup`          | Initialize Mnemo — inject usage instructions and set up storage     |
 | `memory_save`           | Save a memory note with type, optional tags, and source             |
 | `memory_search`         | Hybrid search across memories; returns summaries (supports filters) |
 | `memory_get`            | Retrieve full content of specific notes by ID                       |
@@ -250,7 +251,7 @@ Project mode:
 
 Override the global data directory with `MNEMO_DATA_DIR` environment variable.
 
-Important: Mnemo must be initialized with `memory_setup` before other memory tools are used. Storage resolution follows: project marker first, global marker second, otherwise the tool reports that Mnemo is not initialized.
+Important: Mnemo must be initialized with `npx @s_s/mnemo setup` before memory tools are used. Storage resolution follows: project marker first, global marker second, otherwise the tools report that Mnemo is not initialized.
 
 ### Hybrid Search
 

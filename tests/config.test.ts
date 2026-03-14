@@ -106,7 +106,7 @@ describe('resolveStorageContext', () => {
         const workDir = path.join(tmpDir, 'empty-dir');
         await fs.mkdir(workDir, { recursive: true });
 
-        await expect(resolveStorageContext(workDir)).rejects.toThrow('Run memory_setup first');
+        await expect(resolveStorageContext(workDir)).rejects.toThrow('Run `npx @s_s/mnemo setup` first');
     });
 });
 

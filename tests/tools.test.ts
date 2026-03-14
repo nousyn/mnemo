@@ -9,7 +9,7 @@ import { registerSaveTool } from '../src/tools/save.js';
 import { registerSearchTool } from '../src/tools/search.js';
 import { registerGetTool } from '../src/tools/get.js';
 import { registerCompressTool } from '../src/tools/compress.js';
-import { registerSetupTool } from '../src/tools/setup.js';
+import { runSetup } from '../src/tools/setup.js';
 import { preloadEmbedding, embed } from '../src/core/embedding.js';
 import { extractSummary } from '../src/tools/search.js';
 import { writeStorageConfig } from '../src/core/config.js';
@@ -44,7 +44,6 @@ beforeAll(async () => {
     registerSearchTool(server);
     registerGetTool(server);
     registerCompressTool(server);
-    registerSetupTool(server);
 
     const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
     await server.connect(serverTransport);
@@ -65,7 +64,7 @@ function getResponseText(result: any): string {
 }
 
 describe('tools/list', () => {
-    it('应该列出所有 7 个工具', async () => {
+    it('应该列出所有 6 个工具', async () => {
         const { tools } = await client.listTools();
         const names = tools.map((t) => t.name).sort();
         expect(names).toEqual([
@@ -75,7 +74,6 @@ describe('tools/list', () => {
             'memory_get',
             'memory_save',
             'memory_search',
-            'memory_setup',
         ]);
     });
 
@@ -656,7 +654,7 @@ describe('memory_compress_apply 工具', () => {
     });
 });
 
-describe('memory_setup 工具', () => {
+describe('runSetup (CLI setup function)', () => {
     let cwdSpy: ReturnType<typeof vi.spyOn>;
     let homeSpy: ReturnType<typeof vi.spyOn>;
     let fakeHome: string;
@@ -675,34 +673,26 @@ describe('memory_setup 工具', () => {
     });
 
     it('默认应初始化为 global 存储', async () => {
-        const result = await client.callTool({
-            name: 'memory_setup',
-            arguments: {
-                agent_type: 'claude-code',
-            },
-        });
+        const result = await runSetup({ agentType: 'claude-code' });
 
-        const text = getResponseText(result);
-        expect(text).toContain('Prompt: installed');
-        expect(text).toContain('Storage scope: global');
+        expect(result.success).toBe(true);
+        expect(result.message).toContain('Prompt: installed');
+        expect(result.message).toContain('Storage scope: global');
 
         const written = await fs.readFile(path.join(fakeHome, '.claude', 'CLAUDE.md'), 'utf-8');
         expect(written).toContain('mnemo');
     });
 
     it('指定 project scope 应该写入项目配置和项目 marker', async () => {
-        const result = await client.callTool({
-            name: 'memory_setup',
-            arguments: {
-                agent_type: 'claude-code',
-                scope: 'project',
-            },
+        const result = await runSetup({
+            agentType: 'claude-code',
+            scope: 'project',
         });
 
-        const text = getResponseText(result);
-        expect(text).toMatch(/initialized successfully|updated successfully/);
-        expect(text).toContain('Prompt:');
-        expect(text).toContain('Storage scope: project');
+        expect(result.success).toBe(true);
+        expect(result.message).toMatch(/initialized successfully|updated successfully/);
+        expect(result.message).toContain('Prompt:');
+        expect(result.message).toContain('Storage scope: project');
 
         // 验证文件写到了临时目录而非项目根目录
         const written = await fs.readFile(path.join(tmpDir, 'CLAUDE.md'), 'utf-8');
@@ -713,46 +703,40 @@ describe('memory_setup 工具', () => {
     });
 
     it('重复调用应该更新而非报错', async () => {
-        const result = await client.callTool({
-            name: 'memory_setup',
-            arguments: {
-                agent_type: 'claude-code',
-                scope: 'project',
-            },
+        const result = await runSetup({
+            agentType: 'claude-code',
+            scope: 'project',
         });
 
-        const text = getResponseText(result);
-        expect(text).toContain('updated');
+        expect(result.success).toBe(true);
+        expect(result.message).toContain('updated');
     });
 
     it('project_root 应优先于 cwd', async () => {
         const explicitRoot = path.join(tmpDir, 'explicit-root');
         await fs.mkdir(explicitRoot, { recursive: true });
 
-        const result = await client.callTool({
-            name: 'memory_setup',
-            arguments: {
-                agent_type: 'claude-code',
-                scope: 'project',
-                project_root: explicitRoot,
-            },
+        const result = await runSetup({
+            agentType: 'claude-code',
+            scope: 'project',
+            projectRoot: explicitRoot,
         });
 
-        const text = getResponseText(result);
-        expect(text).toContain(`Prompt: installed → ${path.join(explicitRoot, 'CLAUDE.md')}`);
-        expect(text).toContain(`Storage path: ${path.join(explicitRoot, '.mnemo')}`);
+        expect(result.success).toBe(true);
+        expect(result.message).toContain(`Prompt: installed → ${path.join(explicitRoot, 'CLAUDE.md')}`);
+        expect(result.message).toContain(`Storage path: ${path.join(explicitRoot, '.mnemo')}`);
     });
 });
 
-describe('memory_setup MCP 协议级 agent 检测', () => {
+describe('runSetup agent auto-detection', () => {
     let cwdSpy: ReturnType<typeof vi.spyOn>;
     let homeSpy: ReturnType<typeof vi.spyOn>;
     let fakeHome: string;
     let fakeCwd: string;
 
     beforeAll(async () => {
-        fakeHome = path.join(tmpDir, 'fake-home-mcp');
-        fakeCwd = path.join(tmpDir, 'fake-cwd-mcp');
+        fakeHome = path.join(tmpDir, 'fake-home-detect');
+        fakeCwd = path.join(tmpDir, 'fake-cwd-detect');
         await fs.mkdir(fakeHome, { recursive: true });
         await fs.mkdir(fakeCwd, { recursive: true });
         cwdSpy = vi.spyOn(process, 'cwd').mockReturnValue(fakeCwd);
@@ -764,106 +748,61 @@ describe('memory_setup MCP 协议级 agent 检测', () => {
         homeSpy.mockRestore();
     });
 
-    it('MCP clientInfo.name 为 opencode 时应自动检测为 opencode', async () => {
-        // 创建独立的 server/client 对，client 标识为 opencode
-        const testServer = new McpServer({ name: 'mnemo-test', version: '0.1.0' });
-        registerSetupTool(testServer);
+    it('检测到 CLAUDE.md 文件时应自动识别为 claude-code', async () => {
+        await fs.writeFile(path.join(fakeCwd, 'CLAUDE.md'), '# test', 'utf-8');
 
-        const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
-        await testServer.connect(serverTransport);
+        const result = await runSetup({});
 
-        const testClient = new Client({ name: 'opencode', version: '1.0.0' });
-        await testClient.connect(clientTransport);
+        expect(result.success).toBe(true);
+        expect(result.message).toContain('Agent type: claude-code');
+
+        await fs.rm(path.join(fakeCwd, 'CLAUDE.md'));
+    });
+
+    it('检测到 opencode.json 文件时应自动识别为 opencode', async () => {
+        await fs.writeFile(path.join(fakeCwd, 'opencode.json'), '{}', 'utf-8');
+
+        const result = await runSetup({});
+
+        expect(result.success).toBe(true);
+        expect(result.message).toContain('Agent type: opencode');
+
+        await fs.rm(path.join(fakeCwd, 'opencode.json'));
+    });
+
+    it('无文件标记且不指定 agent 时应报错', async () => {
+        // Use a completely clean directory with no config files
+        const cleanCwd = path.join(tmpDir, 'clean-cwd-no-agent');
+        const cleanHome = path.join(tmpDir, 'clean-home-no-agent');
+        await fs.mkdir(cleanCwd, { recursive: true });
+        await fs.mkdir(cleanHome, { recursive: true });
+
+        const origCwd = vi.spyOn(process, 'cwd').mockReturnValue(cleanCwd);
+        const origHome = vi.spyOn(os, 'homedir').mockReturnValue(cleanHome);
 
         try {
-            const result = await testClient.callTool({
-                name: 'memory_setup',
-                arguments: {},
-            });
-
-            const text = getResponseText(result);
-            expect(text).toContain('Agent type: opencode');
-            expect(text).toMatch(/initialized successfully|updated successfully/);
+            const result = await runSetup({});
+            expect(result.success).toBe(false);
+            expect(result.message).toContain('Could not auto-detect agent type');
         } finally {
-            await testClient.close();
-            await testServer.close();
+            origCwd.mockRestore();
+            origHome.mockRestore();
+            // Restore the outer describe's mocks
+            cwdSpy = vi.spyOn(process, 'cwd').mockReturnValue(fakeCwd);
+            homeSpy = vi.spyOn(os, 'homedir').mockReturnValue(fakeHome);
         }
     });
 
-    it('MCP clientInfo.name 为 openclaw-acp-client 时应自动检测为 openclaw', async () => {
-        const testServer = new McpServer({ name: 'mnemo-test', version: '0.1.0' });
-        registerSetupTool(testServer);
+    it('显式 agentType 应优先于文件检测', async () => {
+        // 创建 opencode 标记文件，但显式指定 claude-code
+        await fs.writeFile(path.join(fakeCwd, 'opencode.json'), '{}', 'utf-8');
 
-        const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
-        await testServer.connect(serverTransport);
+        const result = await runSetup({ agentType: 'claude-code' });
 
-        const testClient = new Client({ name: 'openclaw-acp-client', version: '2026.3.7' });
-        await testClient.connect(clientTransport);
+        expect(result.success).toBe(true);
+        expect(result.message).toContain('Agent type: claude-code');
 
-        try {
-            const result = await testClient.callTool({
-                name: 'memory_setup',
-                arguments: {},
-            });
-
-            const text = getResponseText(result);
-            expect(text).toContain('Agent type: openclaw');
-        } finally {
-            await testClient.close();
-            await testServer.close();
-        }
-    });
-
-    it('未知 clientInfo.name 且无文件标记时应报错', async () => {
-        const testServer = new McpServer({ name: 'mnemo-test', version: '0.1.0' });
-        registerSetupTool(testServer);
-
-        const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
-        await testServer.connect(serverTransport);
-
-        const testClient = new Client({ name: 'unknown-agent', version: '1.0.0' });
-        await testClient.connect(clientTransport);
-
-        try {
-            const result = await testClient.callTool({
-                name: 'memory_setup',
-                arguments: {},
-            });
-
-            const text = getResponseText(result);
-            expect(text).toContain('Could not auto-detect agent type');
-            expect((result as any).isError).toBe(true);
-        } finally {
-            await testClient.close();
-            await testServer.close();
-        }
-    });
-
-    it('显式 agent_type 参数应优先于 MCP 检测', async () => {
-        // client 标识为 opencode，但显式指定 claude-code
-        const testServer = new McpServer({ name: 'mnemo-test', version: '0.1.0' });
-        registerSetupTool(testServer);
-
-        const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
-        await testServer.connect(serverTransport);
-
-        const testClient = new Client({ name: 'opencode', version: '1.0.0' });
-        await testClient.connect(clientTransport);
-
-        try {
-            const result = await testClient.callTool({
-                name: 'memory_setup',
-                arguments: {
-                    agent_type: 'claude-code',
-                },
-            });
-
-            const text = getResponseText(result);
-            expect(text).toContain('Agent type: claude-code');
-        } finally {
-            await testClient.close();
-            await testServer.close();
-        }
+        await fs.rm(path.join(fakeCwd, 'opencode.json'));
     });
 });
 

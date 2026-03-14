@@ -192,7 +192,7 @@ export async function resolveStorageContext(cwd: string = process.cwd()): Promis
         };
     }
 
-    throw new Error('Mnemo is not initialized in the current environment. Run memory_setup first.');
+    throw new Error('Mnemo is not initialized in the current environment. Run `npx @s_s/mnemo setup` first.');
 }
 
 /**

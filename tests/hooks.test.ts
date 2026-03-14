@@ -343,11 +343,7 @@ describe('setup.ts — memory_setup hook 集成', () => {
     });
 
     it('memory_setup 输出应该包含 hook 安装结果', async () => {
-        // We test this by importing the setup module indirectly through MCP
-        const { McpServer } = await import('@modelcontextprotocol/sdk/server/mcp.js');
-        const { Client } = await import('@modelcontextprotocol/sdk/client/index.js');
-        const { InMemoryTransport } = await import('@modelcontextprotocol/sdk/inMemory.js');
-        const { registerSetupTool } = await import('../src/tools/setup.js');
+        const { runSetup } = await import('../src/tools/setup.js');
         const { writeStorageConfig } = await import('../src/core/config.js');
 
         process.env.MNEMO_DATA_DIR = tmpDir;
@@ -359,27 +355,11 @@ describe('setup.ts — memory_setup hook 集成', () => {
         await fs.mkdir(configDir, { recursive: true });
         await fs.writeFile(path.join(configDir, 'opencode.json'), '{}');
 
-        const server = new McpServer({ name: 'mnemo-test', version: '0.1.0' });
-        registerSetupTool(server);
-
-        const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
-        await server.connect(serverTransport);
-        const client = new Client({ name: 'test-client', version: '1.0' });
-        await client.connect(clientTransport);
-
-        const result = await client.callTool({
-            name: 'memory_setup',
-            arguments: { agent_type: 'opencode', scope: 'global' },
-        });
-
-        const text = (result.content as Array<{ type: string; text: string }>)[0].text;
+        const result = await runSetup({ agentType: 'opencode', scope: 'global' });
 
         // Should contain hook status
-        expect(text).toContain('Hooks:');
-        expect(text).toContain('installed');
-        expect(text).toContain('Prompt:');
-
-        await client.close();
-        await server.close();
+        expect(result.message).toContain('Hooks:');
+        expect(result.message).toContain('installed');
+        expect(result.message).toContain('Prompt:');
     });
 });

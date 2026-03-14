@@ -10,53 +10,47 @@ describe('getPromptBlock', () => {
 
     it('应该包含核心指引内容', () => {
         const block = getPromptBlock();
-        expect(block).toContain('memory_setup');
-        expect(block).toContain('memory_save');
         expect(block).toContain('memory_search');
-        expect(block).toContain('memory_get');
         expect(block).toContain('memory_compress');
-        expect(block).toContain('context compaction or context window reset');
+        expect(block).toContain('memory_compress_apply');
         expect(block).toContain('high-value long-term context');
     });
 
-    it('应该包含初始化兜底与默认 global 策略', () => {
+    it('应该包含搜索优先规则', () => {
         const block = getPromptBlock();
-        expect(block).toContain('Mnemo has not been initialized yet');
-        expect(block).toContain('Default to global scope');
-        expect(block).toContain('Use project scope only when the user explicitly wants isolated per-project memory');
-    });
-
-    it('应该包含新的触发顺序与保存边界', () => {
-        const block = getPromptBlock();
-        expect(block).toContain('memory_search -> do the work -> memory_save -> memory_compress');
-        expect(block).toContain('Do not save routine task state');
-        expect(block).toContain('stable preference');
-        expect(block).toContain('continuity thread');
+        expect(block).toContain('Search first');
+        expect(block).toContain('memory_search');
     });
 
     it('应该包含保存阈值与去重引导', () => {
         const block = getPromptBlock();
-        expect(block).toContain('meets at least 2 of these 3 criteria');
-        expect(block).toContain('useful across future sessions');
-        expect(block).toContain('similar memory already exists');
-        expect(block).toContain('updating or replacing existing memories');
+        expect(block).toContain('useful across sessions');
+        expect(block).toContain('affects future work');
+        expect(block).toContain('Dedup before saving');
+        expect(block).toContain('updating/replacing');
     });
 
-    it('save 触发条件应标注建议的 type', () => {
+    it('应该包含类型分类指引', () => {
         const block = getPromptBlock();
-        expect(block).toContain('→ type: preference');
-        expect(block).toContain('→ type: decision');
-        expect(block).toContain('→ type: goal');
-        expect(block).toContain('→ type: continuity');
-        expect(block).toContain('→ type: rule');
-        expect(block).toContain('→ type: experience');
+        expect(block).toContain('Always specify type');
+        expect(block).toContain('preference');
+        expect(block).toContain('continuity');
+        expect(block).toContain('decision');
+        expect(block).toContain('rule');
+        expect(block).toContain('experience');
     });
 
-    it('Guidelines 应包含强制分类指引', () => {
+    it('应该包含生命周期演变规则', () => {
         const block = getPromptBlock();
-        expect(block).toContain('Always specify a type when saving');
-        expect(block).toContain('Determine the type first');
-        expect(block).toContain('Saving without a type defeats the purpose');
+        expect(block).toContain('Lifecycle');
+        expect(block).toContain('Compress');
+        expect(block).toContain('memory_compress_apply');
+    });
+
+    it('应该包含蒸馏而非转储的指引', () => {
+        const block = getPromptBlock();
+        expect(block).toContain('Distill');
+        expect(block).toContain('essence');
     });
 
     it('无 agentType 时应只包含 base prompt', () => {
