@@ -1,4 +1,4 @@
-import { type AgentType } from '../core/config.js';
+import { defineHooks, type AgentType, type HookSet } from '@s_s/agent-kit';
 
 /**
  * Core reminder texts used across all agents.
@@ -50,18 +50,8 @@ EOF
 `;
 
 // ---------------------------------------------------------------------------
-// OpenClaw — HOOK.md + handler.ts templates
+// OpenClaw — handler.ts template
 // ---------------------------------------------------------------------------
-
-/**
- * OpenClaw HOOK.md manifest for the mnemo hook.
- */
-export const OPENCLAW_HOOK_MD = `---
-name: mnemo
-description: "Injects memory management reminder during agent bootstrap"
-metadata: {"openclaw":{"emoji":"\\ud83e\\udde0","events":["agent:bootstrap"]}}
----
-`;
 
 /**
  * OpenClaw handler.ts for agent:bootstrap event.
@@ -155,47 +145,43 @@ export const MnemoReminder = async () => {
 `;
 
 // ---------------------------------------------------------------------------
-// Agent → hook config mapping
+// Hook definitions via agent-kit defineHooks()
 // ---------------------------------------------------------------------------
 
-interface HookScriptConfig {
-    /** Directory where hook files are installed */
-    getHookDir: (home: string) => string;
-    /** Files to generate: filename → content */
-    files: Record<string, string>;
-    /**
-     * For Claude Code / Codex: path to settings.json that needs hook config merged.
-     * For OpenClaw / OpenCode: null (no settings merge needed).
-     */
-    getSettingsPath?: (home: string) => string;
+/**
+ * Get validated HookSet definitions for a specific agent type.
+ * Returns the HookSet(s) ready to pass to kit.installHooks().
+ */
+export function getHookSets(agentType: AgentType): HookSet[] {
+    switch (agentType) {
+        case 'claude-code':
+            return [
+                defineHooks('claude-code', {
+                    events: ['UserPromptSubmit'],
+                    content: ACTIVATOR_SCRIPT,
+                }),
+            ];
+        case 'codex':
+            return [
+                defineHooks('codex', {
+                    events: ['UserPromptSubmit'],
+                    content: ACTIVATOR_SCRIPT,
+                }),
+            ];
+        case 'openclaw':
+            return [
+                defineHooks('openclaw', {
+                    events: ['agent:bootstrap'],
+                    content: OPENCLAW_HANDLER_TS,
+                    description: 'Injects memory management reminder during agent bootstrap',
+                }),
+            ];
+        case 'opencode':
+            return [
+                defineHooks('opencode', {
+                    events: ['experimental.chat.messages.transform'],
+                    content: OPENCODE_PLUGIN_TS,
+                }),
+            ];
+    }
 }
-
-export const HOOK_CONFIGS: Record<AgentType, HookScriptConfig> = {
-    'claude-code': {
-        getHookDir: (home) => `${home}/.claude/hooks/mnemo`,
-        files: {
-            'mnemo-activator.sh': ACTIVATOR_SCRIPT,
-        },
-        getSettingsPath: (home) => `${home}/.claude/settings.json`,
-    },
-    codex: {
-        getHookDir: (home) => `${home}/.codex/hooks/mnemo`,
-        files: {
-            'mnemo-activator.sh': ACTIVATOR_SCRIPT,
-        },
-        getSettingsPath: (home) => `${home}/.codex/settings.json`,
-    },
-    openclaw: {
-        getHookDir: (home) => `${home}/.openclaw/hooks/mnemo`,
-        files: {
-            'HOOK.md': OPENCLAW_HOOK_MD,
-            'handler.ts': OPENCLAW_HANDLER_TS,
-        },
-    },
-    opencode: {
-        getHookDir: (home) => `${home}/.config/opencode/plugins`,
-        files: {
-            'mnemo-reminder.ts': OPENCODE_PLUGIN_TS,
-        },
-    },
-};

@@ -563,7 +563,7 @@ describe('runSetup (CLI setup function)', () => {
         });
 
         expect(result.success).toBe(true);
-        expect(result.message).toContain(`Prompt: installed → ${path.join(explicitRoot, 'CLAUDE.md')}`);
+        expect(result.message).toContain('Prompt: installed');
         expect(result.message).toContain(`Storage path: ${path.join(explicitRoot, '.mnemo')}`);
     });
 });

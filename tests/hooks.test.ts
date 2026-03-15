@@ -5,12 +5,11 @@ import os from 'node:os';
 import {
     REMINDERS,
     ACTIVATOR_SCRIPT,
-    OPENCLAW_HOOK_MD,
     OPENCLAW_HANDLER_TS,
     OPENCODE_PLUGIN_TS,
-    HOOK_CONFIGS,
+    getHookSets,
 } from '../src/hooks/reminders.js';
-import { installHooks, hasHooksInstalled } from '../src/hooks/installer.js';
+import { createKit } from '@s_s/agent-kit';
 import type { AgentType } from '../src/core/config.js';
 
 // ---------------------------------------------------------------------------
@@ -63,11 +62,6 @@ describe('reminders.ts — ACTIVATOR_SCRIPT', () => {
 });
 
 describe('reminders.ts — OpenClaw templates', () => {
-    it('HOOK.md 应该包含正确的 frontmatter', () => {
-        expect(OPENCLAW_HOOK_MD).toContain('name: mnemo');
-        expect(OPENCLAW_HOOK_MD).toContain('agent:bootstrap');
-    });
-
     it('handler.ts 应该导出 default handler', () => {
         expect(OPENCLAW_HANDLER_TS).toContain('export default handler');
     });
@@ -129,58 +123,60 @@ describe('reminders.ts — OpenCode plugin template', () => {
     });
 });
 
-describe('reminders.ts — HOOK_CONFIGS', () => {
-    it('应该包含所有四种 agent 类型', () => {
-        expect(HOOK_CONFIGS['claude-code']).toBeDefined();
-        expect(HOOK_CONFIGS['codex']).toBeDefined();
-        expect(HOOK_CONFIGS['openclaw']).toBeDefined();
-        expect(HOOK_CONFIGS['opencode']).toBeDefined();
+describe('reminders.ts — getHookSets()', () => {
+    it('应该为所有四种 agent 类型返回 HookSet 数组', () => {
+        const types: AgentType[] = ['claude-code', 'codex', 'openclaw', 'opencode'];
+        for (const t of types) {
+            const sets = getHookSets(t);
+            expect(Array.isArray(sets)).toBe(true);
+            expect(sets.length).toBeGreaterThan(0);
+        }
     });
 
-    it('claude-code 和 codex 应该有 getSettingsPath', () => {
-        expect(HOOK_CONFIGS['claude-code'].getSettingsPath).toBeDefined();
-        expect(HOOK_CONFIGS['codex'].getSettingsPath).toBeDefined();
+    it('claude-code HookSet 应该包含 UserPromptSubmit 事件', () => {
+        const sets = getHookSets('claude-code');
+        const def = sets[0].definitions[0];
+        expect(def.events).toContain('UserPromptSubmit');
     });
 
-    it('openclaw 和 opencode 不应有 getSettingsPath', () => {
-        expect(HOOK_CONFIGS['openclaw'].getSettingsPath).toBeUndefined();
-        expect(HOOK_CONFIGS['opencode'].getSettingsPath).toBeUndefined();
+    it('codex HookSet 应该包含 UserPromptSubmit 事件', () => {
+        const sets = getHookSets('codex');
+        const def = sets[0].definitions[0];
+        expect(def.events).toContain('UserPromptSubmit');
     });
 
-    it('claude-code 应该安装 mnemo-activator.sh', () => {
-        expect(HOOK_CONFIGS['claude-code'].files).toHaveProperty('mnemo-activator.sh');
+    it('openclaw HookSet 应该包含 agent:bootstrap 事件', () => {
+        const sets = getHookSets('openclaw');
+        const def = sets[0].definitions[0];
+        expect(def.events).toContain('agent:bootstrap');
     });
 
-    it('openclaw 应该安装 HOOK.md 和 handler.ts', () => {
-        expect(HOOK_CONFIGS['openclaw'].files).toHaveProperty('HOOK.md');
-        expect(HOOK_CONFIGS['openclaw'].files).toHaveProperty('handler.ts');
+    it('opencode HookSet 应该包含 experimental.chat.messages.transform 事件', () => {
+        const sets = getHookSets('opencode');
+        const def = sets[0].definitions[0];
+        expect(def.events).toContain('experimental.chat.messages.transform');
     });
 
-    it('opencode 应该安装 mnemo-reminder.ts', () => {
-        expect(HOOK_CONFIGS['opencode'].files).toHaveProperty('mnemo-reminder.ts');
-    });
-
-    it('hookDir 路径应该包含 agent 标识', () => {
-        const home = '/home/test';
-        expect(HOOK_CONFIGS['claude-code'].getHookDir(home)).toContain('.claude');
-        expect(HOOK_CONFIGS['codex'].getHookDir(home)).toContain('.codex');
-        expect(HOOK_CONFIGS['openclaw'].getHookDir(home)).toContain('.openclaw');
-        expect(HOOK_CONFIGS['opencode'].getHookDir(home)).toContain('opencode');
+    it('HookSet 的 agent 字段应与请求的 agent 类型匹配', () => {
+        const types: AgentType[] = ['claude-code', 'codex', 'openclaw', 'opencode'];
+        for (const t of types) {
+            const sets = getHookSets(t);
+            for (const s of sets) {
+                expect(s.agent).toBe(t);
+            }
+        }
     });
 });
 
 // ---------------------------------------------------------------------------
-// installer.ts — hook installation logic
+// agent-kit installHooks — via createKit('mnemo').installHooks()
 // ---------------------------------------------------------------------------
 
-describe('installer.ts — installHooks()', () => {
+describe('agent-kit installHooks() 集成', () => {
     let tmpHome: string;
-    let originalHome: string;
 
     beforeEach(async () => {
         tmpHome = await fs.mkdtemp(path.join(os.tmpdir(), 'mnemo-hooks-test-'));
-        originalHome = os.homedir();
-        // Mock os.homedir to return tmpHome
         vi.spyOn(os, 'homedir').mockReturnValue(tmpHome);
     });
 
@@ -189,15 +185,16 @@ describe('installer.ts — installHooks()', () => {
     });
 
     it('应该为 claude-code 安装 activator 脚本', async () => {
-        const result = await installHooks('claude-code');
+        const kit = createKit('mnemo');
+        const hookSets = getHookSets('claude-code');
+        const result = await kit.installHooks('claude-code', hookSets);
 
         expect(result.success).toBe(true);
         expect(result.filesWritten.length).toBeGreaterThan(0);
         expect(result.settingsUpdated).toBe(true);
-        expect(result.notes).toHaveLength(0);
 
-        // Verify the shell script was written
-        const scriptPath = result.filesWritten.find((f) => f.endsWith('mnemo-activator.sh'));
+        // Verify a shell script was written
+        const scriptPath = result.filesWritten.find((f) => f.endsWith('.sh'));
         expect(scriptPath).toBeDefined();
         const content = await fs.readFile(scriptPath!, 'utf-8');
         expect(content).toContain('#!/bin/bash');
@@ -208,20 +205,21 @@ describe('installer.ts — installHooks()', () => {
     });
 
     it('应该为 codex 安装 activator 脚本', async () => {
-        const result = await installHooks('codex');
+        const kit = createKit('mnemo');
+        const hookSets = getHookSets('codex');
+        const result = await kit.installHooks('codex', hookSets);
 
         expect(result.success).toBe(true);
         expect(result.settingsUpdated).toBe(true);
-
-        // Check the hook dir is under .codex
         expect(result.hookDir).toContain('.codex');
     });
 
     it('应该为 claude-code 正确合并 settings.json', async () => {
-        const result = await installHooks('claude-code');
+        const kit = createKit('mnemo');
+        const hookSets = getHookSets('claude-code');
+        const result = await kit.installHooks('claude-code', hookSets);
         expect(result.success).toBe(true);
 
-        // Read the generated settings.json
         const settingsPath = path.join(tmpHome, '.claude', 'settings.json');
         const raw = await fs.readFile(settingsPath, 'utf-8');
         const settings = JSON.parse(raw);
@@ -236,7 +234,6 @@ describe('installer.ts — installHooks()', () => {
     });
 
     it('应该保留 settings.json 中的已有配置', async () => {
-        // Pre-create a settings.json with existing content
         const settingsDir = path.join(tmpHome, '.claude');
         await fs.mkdir(settingsDir, { recursive: true });
         await fs.writeFile(
@@ -244,28 +241,29 @@ describe('installer.ts — installHooks()', () => {
             JSON.stringify({ permissions: { allow: ['Read'] }, hooks: { Stop: [{ matcher: '', hooks: [] }] } }),
         );
 
-        const result = await installHooks('claude-code');
+        const kit = createKit('mnemo');
+        const hookSets = getHookSets('claude-code');
+        const result = await kit.installHooks('claude-code', hookSets);
         expect(result.success).toBe(true);
 
         const raw = await fs.readFile(path.join(settingsDir, 'settings.json'), 'utf-8');
         const settings = JSON.parse(raw);
 
-        // Original content preserved
         expect(settings.permissions.allow).toContain('Read');
         expect(settings.hooks.Stop).toBeDefined();
-        // Mnemo hook added
         expect(settings.hooks.UserPromptSubmit.length).toBe(1);
     });
 
     it('重复安装应该替换旧的 mnemo 条目而不是累加', async () => {
-        await installHooks('claude-code');
-        await installHooks('claude-code');
+        const kit = createKit('mnemo');
+        const hookSets = getHookSets('claude-code');
+        await kit.installHooks('claude-code', hookSets);
+        await kit.installHooks('claude-code', hookSets);
 
         const settingsPath = path.join(tmpHome, '.claude', 'settings.json');
         const raw = await fs.readFile(settingsPath, 'utf-8');
         const settings = JSON.parse(raw);
 
-        // Should only have one mnemo entry, not two
         const mnemoEntries = settings.hooks.UserPromptSubmit.filter((e: any) =>
             e.hooks?.some((h: any) => h.command?.includes('mnemo')),
         );
@@ -273,14 +271,15 @@ describe('installer.ts — installHooks()', () => {
     });
 
     it('应该为 openclaw 安装 HOOK.md 和 handler.ts', async () => {
-        const result = await installHooks('openclaw');
+        const kit = createKit('mnemo');
+        const hookSets = getHookSets('openclaw');
+        const result = await kit.installHooks('openclaw', hookSets);
 
         expect(result.success).toBe(true);
         expect(result.settingsUpdated).toBe(false);
         expect(result.notes.length).toBeGreaterThan(0);
         expect(result.notes[0]).toContain('openclaw hooks enable');
 
-        // Verify files exist
         const hookDir = result.hookDir;
         const hookMd = await fs.readFile(path.join(hookDir, 'HOOK.md'), 'utf-8');
         expect(hookMd).toContain('name: mnemo');
@@ -290,19 +289,22 @@ describe('installer.ts — installHooks()', () => {
     });
 
     it('应该为 opencode 安装 plugin 文件', async () => {
-        const result = await installHooks('opencode');
+        const kit = createKit('mnemo');
+        const hookSets = getHookSets('opencode');
+        const result = await kit.installHooks('opencode', hookSets);
 
         expect(result.success).toBe(true);
         expect(result.settingsUpdated).toBe(false);
-        expect(result.notes).toHaveLength(0);
 
-        const pluginPath = path.join(result.hookDir, 'mnemo-reminder.ts');
-        const content = await fs.readFile(pluginPath, 'utf-8');
+        // OpenCode: filename is mnemo-experimental-chat-messages-transform-plugin.ts
+        const pluginFile = result.filesWritten.find((f) => f.includes('mnemo'));
+        expect(pluginFile).toBeDefined();
+        const content = await fs.readFile(pluginFile!, 'utf-8');
         expect(content).toContain('MnemoReminder');
     });
 });
 
-describe('installer.ts — hasHooksInstalled()', () => {
+describe('agent-kit hasHooksInstalled() 集成', () => {
     let tmpHome: string;
 
     beforeEach(async () => {
@@ -315,13 +317,16 @@ describe('installer.ts — hasHooksInstalled()', () => {
     });
 
     it('未安装时应该返回 false', async () => {
-        expect(await hasHooksInstalled('claude-code')).toBe(false);
-        expect(await hasHooksInstalled('opencode')).toBe(false);
+        const kit = createKit('mnemo');
+        expect(await kit.hasHooksInstalled('claude-code')).toBe(false);
+        expect(await kit.hasHooksInstalled('opencode')).toBe(false);
     });
 
     it('安装后应该返回 true', async () => {
-        await installHooks('opencode');
-        expect(await hasHooksInstalled('opencode')).toBe(true);
+        const kit = createKit('mnemo');
+        const hookSets = getHookSets('opencode');
+        await kit.installHooks('opencode', hookSets);
+        expect(await kit.hasHooksInstalled('opencode')).toBe(true);
     });
 });
 

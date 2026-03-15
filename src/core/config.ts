@@ -3,22 +3,9 @@ import os from 'node:os';
 import fs from 'node:fs/promises';
 
 /**
- * Supported agent tool types
+ * Agent types and client name mapping — re-exported from @s_s/agent-kit.
  */
-export const AGENT_TYPES = ['opencode', 'claude-code', 'openclaw', 'codex'] as const;
-
-export type AgentType = (typeof AGENT_TYPES)[number];
-
-/**
- * Map from MCP clientInfo.name to AgentType.
- * Used for protocol-level agent identification during the initialize handshake.
- */
-export const CLIENT_NAME_MAP: Record<string, AgentType> = {
-    opencode: 'opencode',
-    'claude-code': 'claude-code',
-    'openclaw-acp-client': 'openclaw',
-    'codex-mcp-client': 'codex',
-};
+export { AGENT_TYPES, CLIENT_NAME_MAP, type AgentType } from '@s_s/agent-kit';
 
 export type StorageScope = 'global' | 'project';
 
